@@ -185,8 +185,29 @@ function go(r) {
   if (authState.user) renderFolders();
 }
 
+// Signed in, but this computer isn't approved (yet): nothing else opens.
+const deviceBlocked = () => !!(authState.user && (!authState.device || authState.device.status !== 'approved'));
+function renderWaiting() {
+  const d = authState.device;
+  const revoked = d?.status === 'revoked';
+  const out = h('div', { class: 'saved', style: 'min-height:1.4em' });
+  $view.replaceChildren(h('div', { class: 'waiting' },
+    h('img', { class: 'signin-logo', src: 'assets/logo.svg', alt: '' }),
+    h('h1', { class: 'page' }, revoked ? 'This computer was removed' : d ? 'Waiting for approval' : 'Checking this computer…'),
+    h('p', { class: 'sub' }, revoked
+      ? 'An admin removed this computer from Cue. Ask Dylan to approve it again in Settings → Devices.'
+      : d ? `For safety, each computer has to be approved once. Dylan can approve “${d.name}” in Cue → Settings → Devices. This page opens by itself as soon as he does.`
+        : 'One moment while Cue checks this computer is allowed.'),
+    d && !revoked ? h('div', { class: 'row', style: 'gap:10px;justify-content:center' }, h('span', { class: 'spin' }), h('span', { class: 'saved' }, 'Waiting…')) : null,
+    h('div', { class: 'row', style: 'gap:10px;justify-content:center;margin-top:18px' },
+      h('button', { class: 'btn primary', onclick: async () => { out.textContent = 'Checking…'; await call('computer:check'); authState = await call('auth:state'); out.textContent = ''; renderNav(); renderFolders(); renderView(); } }, 'Check again'),
+      h('button', { class: 'btn', onclick: async () => { await call('auth:signOut'); authState = await call('auth:state'); renderAccount(); renderFolders(); go({ view: 'home' }); } }, 'Sign out')),
+    out));
+}
+
 async function renderView() {
   const v = route.view;
+  if (deviceBlocked() && v !== 'signin') return renderWaiting();
   if ($view.dataset.view !== v || $view.dataset.id !== String(route.id || '')) { $view.classList.remove('enter'); void $view.offsetWidth; $view.classList.add('enter'); }
   $view.dataset.view = v;
   $view.dataset.id = String(route.id || '');
@@ -681,7 +702,8 @@ let routedByMain = false;
 window.cue.on('route', (r) => { routedByMain = true; go(r); });
 window.cue.on('calls:changed', () => { renderList(); if (route.view === 'call') renderCall(route.id); if (route.view === 'home') renderHome(); });
 window.cue.on('team:changed', () => { renderList(); renderTeamLive(); });
-window.cue.on('auth:changed', async () => { authState = await call('auth:state'); renderAccount(); renderTeamLive(); renderFolders(); presetsChanged(); if (route.view === 'home') renderHome(); });
+window.cue.on('auth:changed', async () => { authState = await call('auth:state'); renderAccount(); renderNav(); renderTeamLive(); renderFolders(); presetsChanged(); renderView(); });
+window.cue.on('computers:changed', () => { if (route.view === 'settings') renderSettings(); });
 window.cue.on('monitor:event', (e) => onMonitorEvent(e));
 window.cue.on('settings:changed', (s) => { applyTheme(s.theme); if (route.view === 'settings') renderSettings(); });
 window.cue.on('live:notes', (n) => { const el = document.getElementById('live-ai-notes'); if (el && n?.text) el.replaceChildren(h('div', { html: renderMd(n.text) })); });

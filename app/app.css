@@ -551,3 +551,9 @@ a.start-btn.web-get { display: flex; align-items: center; justify-content: cente
 .notepad h1 { font-size: 21px; margin: 22px 0 8px; }
 .notepad h2 { font-size: 18px; margin: 20px 0 6px; }
 .notepad h3 { font-size: 15.5px; margin: 16px 0 4px; }
+
+.waiting { max-width: 520px; margin: 80px auto 0; text-align: center; display: grid; gap: 10px; justify-items: center; }
+.waiting .signin-logo { width: 56px; height: 56px; }
+.devices li.pending { background: var(--amber-bg); border-radius: 10px; }
+.devices li.revoked { opacity: 0.6; }
+.devices .avatar { font-size: 14px; }

@@ -182,7 +182,7 @@ async function teamSettingsPanels(s) {
         h('span', { class: 'tx' }, h('b', {}, 'Tell me when a teammate starts a call'), h('span', {}, 'A notification with a link to watch it live.'))) : null));
   }
 
-  if (authState.user?.role === 'admin') panels.push(await adminPanel(), await coachingPanel(), await shareDomainPanel());
+  if (authState.user?.role === 'admin') panels.push(await adminPanel(), await devicesPanel(), await coachingPanel(), await shareDomainPanel());
 
   // Who we are + how we sell
   const ws = await call('workspace:get');
@@ -349,6 +349,27 @@ async function teamCalendarPanel() {
       st.connected ? h('button', { class: 'link-btn danger', onclick: async () => { if (confirm('Disconnect team calendars for everyone?')) { await call('teamcal:disconnect'); renderSettings(); } } }, 'Disconnect') : null),
     st.available ? null : h('div', { class: 'hint' }, st.webOnly ? 'Connect or reconnect team calendars from the Cue desktop app.' : 'This build has no Google sign-in set up.'),
     err);
+}
+
+// Approved computers: each computer or browser has to be approved once.
+async function devicesPanel() {
+  const list = await call('computers:list');
+  const msg = h('span', { class: 'saved' });
+  const act = async (id, status) => { const r = await call('computers:set', { id, status }); if (!r.ok) msg.textContent = r.error; renderSettings(); };
+  const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 2 ? 'now' : m < 60 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
+  const pending = list.filter((d) => d.status === 'pending');
+  return h('div', { class: 'panel' }, h('div', { class: 'row' }, h('h3', { class: 'grow' }, 'Devices'), msg),
+    h('p', { class: 'hint' }, 'Cue only opens on computers and browsers you approve. Removing one signs it out right away, including its Claude connector.'),
+    pending.length ? h('div', { class: 'banner warn', style: 'margin-bottom:10px' }, `${pending.length} waiting for your approval`) : null,
+    h('ul', { class: 'members devices' }, list.map((d) => h('li', { class: d.status },
+      h('span', { class: 'avatar' }, d.platform === 'Web' ? '🌐' : d.platform === 'Mac' ? '⌘' : '⊞'),
+      h('span', { class: 'grow' },
+        h('b', { title: 'Click to rename', style: 'cursor:text', onclick: async () => { const n = prompt('Name for this computer', d.name); if (n && n.trim() && n !== d.name) { await call('computers:rename', { id: d.id, name: n.trim() }); renderSettings(); } } }, d.name),
+        h('span', {}, ` ${d.owner}${d.thisDevice ? ' · this computer' : ''} · seen ${ago(d.lastSeen)}`)),
+      d.status === 'pending' ? h('button', { class: 'btn primary', onclick: () => act(d.id, 'approved') }, 'Approve') : null,
+      d.status === 'revoked' ? h('span', { class: 'chip bad' }, 'Removed') : h('span', { class: 'chip' }, d.status === 'approved' ? 'Approved' : 'Waiting'),
+      d.status !== 'revoked' && !d.thisDevice ? h('button', { class: 'link-btn danger', onclick: () => { if (confirm(`Remove “${d.name}”? It will be signed out right away.`)) act(d.id, 'revoked'); } }, d.status === 'pending' ? 'Deny' : 'Remove') : null,
+      d.status === 'revoked' ? h('button', { class: 'link-btn', onclick: () => act(d.id, 'approved') }, 'Approve again') : null))));
 }
 
 // How the live coach judges talk time (team-wide; Claude can change it too).
