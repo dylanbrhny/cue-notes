@@ -55,6 +55,15 @@ function callWho(c) {
   const people = outside.map((a) => a.name || a.email.split('@')[0]).filter(Boolean);
   return { domain, company, people };
 }
+// Really on a call now: your current call, or a teammate's that started in the
+// last 6 hours. Your own old "live" calls were cut off by a quit or crash.
+function isLiveNow(c) {
+  if (c.status !== 'live' && c.status !== 'writing') return false;
+  if (c.status === 'writing') return true;
+  if (typeof liveState !== 'undefined' && liveState?.mode === 'live' && liveState.callId === c.id) return true;
+  return c.mine === false && Date.now() - c.startedAt < 6 * 3600_000;
+}
+
 function callAvatar(c, who) {
   if (who.domain) return companyLogo(who.domain, who.company, 30);
   const letter = (who.people[0] || '').trim()[0];
@@ -71,12 +80,17 @@ function callRows(meetings, { showOwner = true } = {}) {
     const sub = [who.company && !c.title?.toLowerCase().includes(who.company.toLowerCase()) ? who.company : null,
       who.people.length ? who.people.slice(0, 2).join(', ') + (who.people.length > 2 ? ` +${who.people.length - 2}` : '') : null,
       showOwner && c.mine === false && c.owner ? c.owner.split(' ')[0] : null].filter(Boolean).join(' · ');
+    const liveNow = isLiveNow(c);
     const row = h('button', { class: `call-item ${selectedCalls.has(c.id) ? 'selected' : ''}`, 'data-call': c.id,
       onclick: (e) => onCallClick(e, c.id, () => go(c.status === 'live' && c.mine === false ? { view: 'monitor', id: c.id } : { view: 'call', id: c.id })),
       oncontextmenu: (e) => callContextMenu(e, c) },
-      callAvatar(c, who),
+      // The icon turns into a select box on hover (or once anything is selected).
+      h('span', { class: 'ci-lead' }, callAvatar(c, who),
+        h('span', { class: 'ci-check', role: 'checkbox', title: 'Select', 'aria-label': 'Select', html: ICON.check,
+          onmousedown: (e) => e.stopPropagation(),
+          onclick: (e) => { e.stopPropagation(); e.preventDefault(); toggleSelected(c.id); } })),
       h('span', { class: 'ci-main' },
-        h('span', { class: 'ci-title' }, c.status === 'live' ? h('i', { class: 'live-dot' }) : null, c.visibility === 'private' ? h('span', { class: 'lock inline', html: ICON.lock }) : null, c.title || 'Untitled call'),
+        h('span', { class: 'ci-title' }, liveNow ? h('i', { class: 'live-dot' }) : null, c.visibility === 'private' ? h('span', { class: 'lock inline', html: ICON.lock }) : null, c.title || 'Untitled call'),
         sub ? h('span', { class: 'ci-sub' }, sub) : null),
       h('span', { class: 'ci-time' }, timeOf(c.startedAt)),
       rowActions(c));
@@ -108,7 +122,10 @@ async function playDemo() {
   const url = await call('demo:url');
   if (!url) { alert('Couldn’t load the demo. Check you’re signed in and online.'); return; }
   try { localStorage.setItem('cue-demo-hidden', '1'); } catch {}
-  const video = h('video', { src: url, controls: true, autoplay: true, playsinline: true, poster: 'assets/demo-poster.jpg' });
+  // Plays inside the Cue window: full-screen video goes black in the desktop app.
+  const video = h('video', { src: url, controls: true, autoplay: true, playsinline: true, poster: 'assets/demo-poster.jpg', controlsList: 'nofullscreen noremoteplayback nodownload', disablePictureInPicture: true,
+    ondblclick: (e) => e.preventDefault() });
+  video.addEventListener('fullscreenchange', () => { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); });
   const close = () => { video.pause(); shade.remove(); removeEventListener('keydown', esc); };
   const esc = (e) => { if (e.key === 'Escape') close(); };
   const shade = h('div', { class: 'demo-shade', onclick: (e) => { if (e.target === shade) close(); } },

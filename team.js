@@ -911,7 +911,7 @@ function contextMenu(e, items) {
 
 function callContextMenu(e, c) {
   if (!authState.user) return;
-  const done = c.status !== 'live' && c.status !== 'writing';
+  const done = !isLiveNow(c);
   const ids = actionIds(c.id);
   const many = ids.length > 1 ? ` ${ids.length} calls` : '';
   contextMenu(e, [
@@ -924,7 +924,7 @@ function callContextMenu(e, c) {
 
 // Shown on a call row while the mouse is over it.
 function rowActions(c) {
-  if (!authState.user || c.status === 'live' || c.status === 'writing') return null;
+  if (!authState.user || isLiveNow(c)) return null;
   const btn = (title, icon, fn) => h('button', { class: 'ra-btn', title, 'aria-label': title, html: ICON[icon],
     onmousedown: (e) => e.stopPropagation(),
     onclick: (e) => { e.stopPropagation(); e.preventDefault(); fn(e); } });

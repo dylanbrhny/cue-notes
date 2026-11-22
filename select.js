@@ -8,7 +8,12 @@ let lastSelected = null;
 
 function paintSelection() {
   document.querySelectorAll('.call-item[data-call]').forEach((el) => el.classList.toggle('selected', selectedCalls.has(el.dataset.call)));
+  document.body.classList.toggle('has-selection', selectedCalls.size > 0);
   drawSelBar();
+}
+function toggleSelected(id) {
+  if (selectedCalls.has(id)) selectedCalls.delete(id); else selectedCalls.add(id);
+  lastSelected = id; paintSelection();
 }
 function clearSelection() { if (!selectedCalls.size) return; selectedCalls.clear(); lastSelected = null; paintSelection(); }
 
@@ -54,7 +59,8 @@ function drawSelBar() {
     folders.map((f) => h('option', { value: f.id }, typeof folderPath === 'function' ? folderPath(f.id) : f.name)));
   const bar = h('div', { class: 'sel-bar' },
     h('b', {}, `${selectedCalls.size} call${selectedCalls.size === 1 ? '' : 's'} selected`),
-    h('span', {}, 'Drag onto a folder, or'), move,
+    h('button', { class: 'link-btn', onclick: () => { document.querySelectorAll('#view .call-item[data-call]').forEach((el) => selectedCalls.add(el.dataset.call)); paintSelection(); } }, 'Select all'),
+    move,
     h('button', { class: 'link-btn', onclick: () => archiveCalls([...selectedCalls], route.view !== 'archive') }, route.view === 'archive' ? 'Unarchive' : 'Archive'),
     h('button', { class: 'link-btn danger', onclick: () => trashCalls([...selectedCalls]) }, 'Delete'),
     h('button', { class: 'link-btn', onclick: clearSelection }, 'Clear'));
