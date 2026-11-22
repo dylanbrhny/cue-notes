@@ -691,6 +691,10 @@ async function renderSettings() {
     h('h1', { class: 'page' }, 'Settings'),
     h('p', { class: 'sub' }, WEB ? 'Cue on the web: everything except recording calls. Recording, the call widget and audio live in the desktop app.' : 'Keys are stored encrypted on this computer and only sent to ElevenLabs and Anthropic.'),
     locked ? h('div', { class: 'banner' }, 'Only Dylan can change Cue’s settings. You can pick your own theme.') : null,
+    authState.user?.role === 'admin' ? h('button', { class: 'banner banner-link', onclick: () => go({ view: 'admin' }) },
+      h('span', { html: ICON.shield, style: 'display:inline-grid;width:16px;height:16px' }),
+      h('span', { class: 'grow' }, h('b', {}, 'Team settings are on the Admin page'), ' · coaching, playbook, presets, devices, calendars, share links, keys and the simulator'),
+      h('span', {}, 'Open →')) : null,
     h('div', { class: 'panel', 'data-open': '' }, h('h3', {}, 'Appearance'),
       h('div', { class: 'theme-pick' }, [
         ['synapse', 'Synapse', '#070b16', ['#4a9eff', '#34d399']],

@@ -618,3 +618,4 @@ a.start-btn.web-get { display: flex; align-items: center; justify-content: cente
 .panel.locked { opacity: 0.72; }
 .panel.locked .btn.allow { opacity: 1; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.banner-link { width: 100%; text-align: left; cursor: pointer; color: var(--text-2); } .banner-link:hover { border-color: var(--line-2); color: var(--text); } .banner-link b { color: var(--text); font-weight: 600; }
