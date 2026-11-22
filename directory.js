@@ -72,7 +72,8 @@ function callRows(meetings, { showOwner = true } = {}) {
       who.people.length ? who.people.slice(0, 2).join(', ') + (who.people.length > 2 ? ` +${who.people.length - 2}` : '') : null,
       showOwner && c.mine === false && c.owner ? c.owner.split(' ')[0] : null].filter(Boolean).join(' · ');
     const row = h('button', { class: `call-item ${selectedCalls.has(c.id) ? 'selected' : ''}`, 'data-call': c.id,
-      onclick: (e) => onCallClick(e, c.id, () => go(c.status === 'live' && c.mine === false ? { view: 'monitor', id: c.id } : { view: 'call', id: c.id })) },
+      onclick: (e) => onCallClick(e, c.id, () => go(c.status === 'live' && c.mine === false ? { view: 'monitor', id: c.id } : { view: 'call', id: c.id })),
+      oncontextmenu: (e) => callContextMenu(e, c) },
       callAvatar(c, who),
       h('span', { class: 'ci-main' },
         h('span', { class: 'ci-title' }, c.status === 'live' ? h('i', { class: 'live-dot' }) : null, c.visibility === 'private' ? h('span', { class: 'lock inline', html: ICON.lock }) : null, c.title || 'Untitled call'),

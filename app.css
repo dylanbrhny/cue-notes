@@ -557,3 +557,30 @@ a.start-btn.web-get { display: flex; align-items: center; justify-content: cente
 .devices li.pending { background: var(--amber-bg); border-radius: 10px; }
 .devices li.revoked { opacity: 0.6; }
 .devices .avatar { font-size: 14px; }
+
+/* Live tab: always in the nav, glows while a call is on */
+.live-nav { position: relative; }
+.live-nav.glow { color: var(--green); background: color-mix(in srgb, var(--green) 10%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--green) 28%, transparent), 0 0 18px color-mix(in srgb, var(--green) 22%, transparent); animation: live-glow 2.4s ease-in-out infinite; }
+.live-nav.glow:hover, .live-nav.glow.on { color: var(--green); background: color-mix(in srgb, var(--green) 16%, transparent); }
+.live-count { margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--green); color: #04120c; font-size: 11px; font-weight: 700; display: inline-grid; place-items: center; }
+@keyframes live-glow { 0%, 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--green) 28%, transparent), 0 0 10px color-mix(in srgb, var(--green) 12%, transparent); } 50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--green) 45%, transparent), 0 0 22px color-mix(in srgb, var(--green) 30%, transparent); } }
+.live-list { display: grid; gap: 8px; max-width: 760px; }
+.live-card { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; border: 1px solid color-mix(in srgb, var(--green) 30%, var(--line)); background: color-mix(in srgb, var(--green) 6%, var(--card)); border-radius: 12px; padding: 14px 16px; color: var(--text); }
+.live-card:hover { border-color: color-mix(in srgb, var(--green) 55%, var(--line)); }
+.live-card .grow { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.live-card .grow b { font-size: 14px; font-weight: 600; }
+.live-card .grow span { font-size: 12.5px; color: var(--text-3); }
+.lw-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); flex: none; animation: live-pulse 2s infinite; }
+.lw-time { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--green); }
+.live-card .btn { pointer-events: none; }
+.live-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 56px 20px; border: 1px dashed var(--line-2); border-radius: 14px; max-width: 760px; color: var(--text-3); font-size: 13px; text-align: center; }
+.live-empty b { color: var(--text); font-size: 15px; font-weight: 600; }
+.le-ring { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--bg-hover); color: var(--text-3); margin-bottom: 6px; }
+.le-ring svg { width: 22px; height: 22px; }
+
+/* Share */
+.chip-btn.share-chip.on { color: var(--green); border-color: color-mix(in srgb, var(--green) 40%, transparent); }
+.ctx-menu { position: fixed; left: 0; top: 0; right: auto; min-width: 180px; z-index: 1000; }
+.flash { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 1001; background: var(--text); color: var(--bg); font-size: 13px; padding: 8px 14px; border-radius: 999px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); animation: flash-in .18s ease-out; transition: opacity .3s, transform .3s; }
+.flash.out { opacity: 0; transform: translateX(-50%) translateY(6px); }
+@keyframes flash-in { from { opacity: 0; transform: translateX(-50%) translateY(6px); } }

@@ -54,17 +54,45 @@ function renderAccount() {
 // Who's live right now (sidebar)
 // ---------------------------------------------------------------------------
 
-let teamLive = [];
+let teamLiveKey = '';
 async function renderTeamLive() {
-  const el = document.getElementById('team-live');
-  if (!el) return;
-  teamLive = authState.user ? await call('team:live') : [];
-  if (!teamLive.length) { el.replaceChildren(); return; }
-  el.replaceChildren(
-    h('div', { class: 'side-label' }, 'Live now'),
-    ...teamLive.map((c) => h('button', { class: `call-row live-row ${route.view === 'monitor' && route.id === c.id ? 'on' : ''}`, onclick: () => go({ view: 'monitor', id: c.id }) },
-      h('div', { class: 't' }, h('span', { class: 'live-dot pulse' }), `${c.owner || 'Teammate'}: ${c.title}`),
-      h('div', { class: 'm' }, `${c.presetName || 'Call'} · started ${timeOf(c.startedAt)} · watch`))));
+  teamLive = authState.user ? await call('team:live').catch(() => []) : [];
+  const key = teamLive.map((c) => c.id).join(',');
+  if (key === teamLiveKey) return;
+  teamLiveKey = key;
+  renderNav();
+  if (route.view === 'watch') renderWatch();
+}
+
+// The Live page: every call happening on the team right now.
+let watchTimer = null;
+function renderWatch() {
+  clearInterval(watchTimer);
+  const list = teamLive;
+  const rows = list.map((c) => {
+    const timer = h('span', { class: 'lw-time' }, fmtDur(Date.now() - c.startedAt));
+    timer.dataset.start = c.startedAt;
+    return h('button', { class: 'live-card', onclick: () => go(c.mine ? { view: 'live' } : { view: 'monitor', id: c.id }) },
+      h('span', { class: 'lw-dot' }),
+      h('span', { class: 'grow' },
+        h('b', {}, c.title || 'Call'),
+        h('span', {}, [c.mine ? 'You' : c.owner || 'Teammate', c.presetName].filter(Boolean).join(' · '))),
+      timer,
+      h('span', { class: 'btn primary' }, c.mine ? 'Open' : 'Watch live'));
+  });
+  $view.replaceChildren(
+    h('h1', { class: 'page' }, 'Live'),
+    h('p', { class: 'hint', style: 'margin:0 0 18px;color:var(--text-3)' }, list.length
+      ? 'Open a call to follow the transcript, checklist and talk time as it happens, and send a quiet nudge.'
+      : 'Calls show up here the moment anyone on the team starts recording.'),
+    list.length ? h('div', { class: 'live-list' }, rows) : h('div', { class: 'live-empty' },
+      h('span', { class: 'le-ring', html: ICON.live }),
+      h('b', {}, 'Nobody is on a call right now'),
+      h('span', {}, 'This page updates by itself.')));
+  if (list.length) watchTimer = setInterval(() => {
+    if (route.view !== 'watch') return clearInterval(watchTimer);
+    document.querySelectorAll('.lw-time').forEach((el) => { el.textContent = fmtDur(Date.now() - Number(el.dataset.start)); });
+  }, 1000);
 }
 
 // ---------------------------------------------------------------------------
@@ -714,26 +742,67 @@ function privacyToggle(c) {
 }
 
 // Share link: anyone with it can read the notes and transcript until it's turned off.
+// One click makes the link (if there isn't one yet) and copies it.
+async function copyShareLink(id) {
+  let share = await call('share:get', id).catch(() => null);
+  if (!share) {
+    const r = await call('share:create', id);
+    if (!r.ok) { alert(r.error); return null; }
+    share = r;
+  }
+  await navigator.clipboard.writeText(share.url).catch(() => {});
+  return share;
+}
+
+// A small "Link copied" note at the bottom of the window.
+function flash(text) {
+  document.querySelectorAll('.flash').forEach((x) => x.remove());
+  const el = h('div', { class: 'flash' }, text);
+  document.body.append(el);
+  setTimeout(() => el.classList.add('out'), 1800);
+  setTimeout(() => el.remove(), 2200);
+}
+
+// Right-click menu, drawn by Cue so it looks the same on Mac, Windows and web.
+function contextMenu(e, items) {
+  e.preventDefault();
+  document.querySelectorAll('.ctx-menu').forEach((x) => x.remove());
+  const menu = h('div', { class: 'pop menu-pop ctx-menu' }, items.filter(Boolean).map(([label, fn, danger]) =>
+    h('button', { class: danger ? 'danger' : '', onclick: () => { menu.remove(); fn(); } }, label)));
+  document.body.append(menu);
+  const r = menu.getBoundingClientRect();
+  menu.style.left = `${Math.min(e.clientX, innerWidth - r.width - 8)}px`;
+  menu.style.top = `${Math.min(e.clientY, innerHeight - r.height - 8)}px`;
+  const close = (ev) => { if (!menu.contains(ev.target)) { menu.remove(); removeEventListener('mousedown', close, true); } };
+  setTimeout(() => addEventListener('mousedown', close, true));
+}
+
+function callContextMenu(e, c) {
+  if (!authState.user) return;
+  const done = c.status !== 'live' && c.status !== 'writing';
+  contextMenu(e, [
+    ['Open', () => go(c.status === 'live' && c.mine === false ? { view: 'monitor', id: c.id } : { view: 'call', id: c.id })],
+    done ? ['Copy share link', async () => { if (await copyShareLink(c.id)) flash('Share link copied'); }] : null,
+  ]);
+}
+
 function shareButton(c) {
   if (!authState.user || c.status === 'live' || c.status === 'writing') return null;
   const box = h('div', { class: 'share-box', hidden: true });
-  const btn = h('button', { class: 'chip-btn', title: 'Make a link anyone can open', onclick: async () => {
-    box.hidden = !box.hidden;
-    if (!box.hidden) fill(await call('share:get', c.id));
-  } }, h('span', { html: ICON.link || '', style: 'display:inline-grid;width:12px;height:12px;vertical-align:-1px;margin-right:5px' }), 'Share');
+  const label = h('span', {}, 'Share');
+  const btn = h('button', { class: 'chip-btn share-chip', title: 'Copy a link anyone can open', onclick: async () => {
+    const was = label.textContent;
+    label.textContent = 'Copying…';
+    const share = await copyShareLink(c.id);
+    label.textContent = share ? 'Shared' : was;
+    if (share) btn.classList.add('on');
+    if (!share) return;
+    fill(share);
+    box.hidden = false;
+    flash('Share link copied');
+  } }, h('span', { html: ICON.link || '', style: 'display:inline-grid;width:12px;height:12px;vertical-align:-1px;margin-right:5px' }), label);
   const copy = async (url, el) => { await navigator.clipboard.writeText(url).catch(() => {}); el.textContent = 'Copied'; setTimeout(() => { el.textContent = 'Copy link'; }, 1500); };
   function fill(share) {
-    if (!share) {
-      box.replaceChildren(
-        h('div', { class: 'share-tx' }, h('b', {}, 'Share this call'), h('span', {}, 'Makes a private link to the notes and transcript. Anyone who has it can read them until you turn it off.')),
-        h('button', { class: 'btn primary', onclick: async (e) => {
-          e.target.disabled = true; e.target.textContent = 'Making link…';
-          const r = await call('share:create', c.id);
-          if (!r.ok) { alert(r.error); fill(null); return; }
-          fill(r); copy(r.url, box.querySelector('.copy-btn'));
-        } }, 'Create link'));
-      return;
-    }
     box.replaceChildren(
       h('input', { class: 'input share-url', readonly: true, value: share.url, onclick: (e) => e.target.select() }),
       h('button', { class: 'btn copy-btn', onclick: (e) => copy(share.url, e.target) }, 'Copy link'),
@@ -741,10 +810,14 @@ function shareButton(c) {
         if (!confirm('Turn this link off? Anyone who has it will stop being able to open it.')) return;
         const r = await call('share:remove', c.id);
         if (!r.ok) { alert(r.error); return; }
-        fill(null);
+        box.hidden = true;
+        flash('Link turned off');
       } }, 'Turn off'),
-      h('div', { class: 'share-note' }, `Opened ${share.views || 0} time${share.views === 1 ? '' : 's'}. Typed private notes and emails are never shown.`));
+      h('button', { class: 'link-btn', onclick: () => { box.hidden = true; } }, 'Hide'),
+      h('div', { class: 'share-note' }, `Link copied. Opened ${share.views || 0} time${share.views === 1 ? '' : 's'}. Anyone with it can read the notes and transcript until you turn it off; typed private notes and emails never show.`));
   }
+  // Already shared: say so on the button.
+  call('share:get', c.id).then((share) => { if (share) { btn.classList.add('on'); label.textContent = 'Shared'; btn.title = `Copy the link (opened ${share.views || 0} time${share.views === 1 ? '' : 's'})`; } }).catch(() => {});
   return [btn, box];
 }
 

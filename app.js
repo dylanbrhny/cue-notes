@@ -25,6 +25,7 @@ let presetsCache = null;
 let templatesCache = null;
 let authState = { configured: false, user: null };
 
+let teamLive = []; // calls live on the team right now (team.js keeps it fresh)
 const ICON = {
   check: '<svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2l2.3 2.3 4.7-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   calls: '<svg viewBox="0 0 16 16" fill="none"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5" stroke="currentColor" stroke-width="1.4"/><path d="M5 6h6M5 8.5h6M5 11h3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
@@ -40,6 +41,7 @@ const ICON = {
   personTab: '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5.5" r="2.5" stroke="currentColor" stroke-width="1.3"/><path d="M3 13.5c.6-2.6 2.6-4 5-4s4.4 1.4 5 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
   filesTab: '<svg viewBox="0 0 16 16" fill="none"><path d="M8 2.5l5.5 2.8L8 8.1 2.5 5.3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 8l5.5 2.8L13.5 8M2.5 10.7l5.5 2.8 5.5-2.8" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
   folder: '<svg viewBox="0 0 16 16" fill="none"><path d="M2.5 4.5a1.5 1.5 0 0 1 1.5-1.5h2.4l1.4 1.6H12a1.5 1.5 0 0 1 1.5 1.5v5.4a1.5 1.5 0 0 1-1.5 1.5H4a1.5 1.5 0 0 1-1.5-1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
+  live: '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="1.8" fill="currentColor"/><path d="M5.2 5.2a4 4 0 0 0 0 5.6M10.8 5.2a4 4 0 0 1 0 5.6M3.3 3.3a6.6 6.6 0 0 0 0 9.4M12.7 3.3a6.6 6.6 0 0 1 0 9.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
   sparkle: '<svg viewBox="0 0 16 16" fill="none"><path d="M8 2.5l1.3 3.2 3.2 1.3-3.2 1.3L8 11.5 6.7 8.3 3.5 7l3.2-1.3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M12.5 11v3M11 12.5h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
   plus: '<svg viewBox="0 0 16 16" fill="none"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
 };
@@ -131,7 +133,14 @@ function renderNav() {
     class: `nav-item ${route.view === view ? 'on' : ''}`,
     onclick: () => go({ view }),
   }, h('span', { html: ICON[icon], style: 'display:inline-grid' }), label);
-  $nav.replaceChildren(item('home', 'Home', 'calls'), authState.user ? item('ask', 'Ask Cue', 'sparkle') : null, item('presets', 'Presets', 'presets'), item('settings', 'Settings', 'settings'));
+  // Live is always there; it glows (with a count) while anyone on the team is on a call.
+  const n = teamLive.length;
+  const live = authState.user ? h('button', {
+    class: `nav-item live-nav ${route.view === 'watch' ? 'on' : ''} ${n ? 'glow' : ''}`,
+    title: n ? `${n} call${n === 1 ? '' : 's'} live now` : 'Nobody is on a call',
+    onclick: () => go({ view: 'watch' }),
+  }, h('span', { html: ICON.live, style: 'display:inline-grid' }), 'Live', n ? h('span', { class: 'live-count' }, n) : null) : null;
+  $nav.replaceChildren(item('home', 'Home', 'calls'), live, authState.user ? item('ask', 'Ask Cue', 'sparkle') : null, item('presets', 'Presets', 'presets'), item('settings', 'Settings', 'settings'));
 }
 
 async function renderList() {
@@ -214,6 +223,7 @@ async function renderView() {
   if (v === 'live') { liveState = await call('call:state'); renderList(); return renderLive(true); }
   if (v === 'call') return renderCall(route.id);
   if (v === 'monitor') return renderMonitor(route.id);
+  if (v === 'watch') return renderWatch();
   if (v === 'folder') return renderFolder(route.id);
   if (v === 'space') return renderSpace(route.id);
   if (v === 'companies') return renderCompanies();
