@@ -208,7 +208,8 @@ async function teamSettingsPanels(s) {
           h('button', { class: 'btn primary', onclick: () => { sessionStorage.removeItem('cue-offline'); renderSignIn(); } }, 'Sign in')),
       authState.user ? h('label', { class: 'toggle' },
         h('input', { type: 'checkbox', checked: !!s.notifyTeamCalls, onchange: (e) => call('settings:save', { notifyTeamCalls: e.target.checked }) }),
-        h('span', { class: 'tx' }, h('b', {}, 'Tell me when a teammate starts a call'), h('span', {}, 'A notification with a link to watch it live.'))) : null));
+        h('span', { class: 'tx' }, h('b', {}, 'Tell me when a teammate starts a call'), h('span', {}, 'A notification with a link to watch it live.'))) : null,
+      authState.user ? h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'link-btn allow', onclick: () => playDemo() }, '▶ Watch the 90-second Cue demo')) : null));
   }
 
   // Calendar

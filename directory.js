@@ -90,6 +90,33 @@ function callRows(meetings, { showOwner = true } = {}) {
 // Notes tab
 // ---------------------------------------------------------------------------
 
+// The 90-second product demo, on Home until it's been watched or hidden.
+function demoCard() {
+  if (!authState.user) return null;
+  let hidden = false;
+  try { hidden = localStorage.getItem('cue-demo-hidden') === '1'; } catch {}
+  if (hidden) return null;
+  const hide = (e) => { e?.stopPropagation(); try { localStorage.setItem('cue-demo-hidden', '1'); } catch {} card.remove(); };
+  const card = h('div', { class: 'demo-card', role: 'button', tabindex: '0', onclick: () => playDemo(), onkeydown: (e) => { if (e.key === 'Enter') playDemo(); } },
+    h('span', { class: 'demo-thumb' }, h('img', { src: 'assets/demo-poster.jpg', alt: '' }), h('span', { class: 'demo-play' })),
+    h('span', { class: 'grow' }, h('b', {}, 'Watch how Cue works'), h('span', {}, '90 seconds: the live coach, notes, the Live tab, sharing and more.')),
+    h('button', { class: 'link-btn', onclick: hide }, 'Hide'));
+  return card;
+}
+
+async function playDemo() {
+  const url = await call('demo:url');
+  if (!url) { alert('Couldn’t load the demo. Check you’re signed in and online.'); return; }
+  try { localStorage.setItem('cue-demo-hidden', '1'); } catch {}
+  const video = h('video', { src: url, controls: true, autoplay: true, playsinline: true, poster: 'assets/demo-poster.jpg' });
+  const close = () => { video.pause(); shade.remove(); removeEventListener('keydown', esc); };
+  const esc = (e) => { if (e.key === 'Escape') close(); };
+  const shade = h('div', { class: 'demo-shade', onclick: (e) => { if (e.target === shade) close(); } },
+    h('div', { class: 'demo-player' }, video, h('button', { class: 'demo-close', 'aria-label': 'Close', onclick: close }, '×')));
+  document.body.append(shade);
+  addEventListener('keydown', esc);
+}
+
 // Teammates on a call right now: watch the transcript and checklist live.
 async function liveNowSection() {
   if (!authState.user) return null;
@@ -151,7 +178,7 @@ async function renderNotesTab() {
   draw('');
   const [nudge, soon, liveNow] = await Promise.all([WEB ? null : calendarNudge(), comingUp(), liveNowSection()]);
   if (route.view !== 'home') return; // the user moved on while this loaded
-  $view.replaceChildren(tabBar('home'), liveNow, nudge, soon,
+  $view.replaceChildren(tabBar('home'), demoCard(), liveNow, nudge, soon,
     h('div', { class: 'row tab-tools' }, searchBox('Search titles, people, notes and transcripts', draw)),
     list);
 }
