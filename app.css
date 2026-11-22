@@ -679,3 +679,40 @@ a.start-btn.web-get { display: flex; align-items: center; justify-content: cente
 .call-item.selected .ci-check { display: grid; background: var(--accent, #4a9eff); border-color: var(--accent, #4a9eff); color: #fff; }
 .sel-bar, .sel-bar * { white-space: nowrap; }
 .sel-bar .chip-select { max-width: 200px; }
+
+/* What wins */
+.oc-pill { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .02em; padding: 1px 6px; border-radius: 999px; margin-right: 6px; vertical-align: 1px; }
+.oc-pill.won { background: color-mix(in srgb, var(--green) 18%, transparent); color: var(--green); }
+.oc-pill.lost { background: color-mix(in srgb, var(--red) 16%, transparent); color: var(--red); }
+.oc-pick { display: inline-flex; border: 1px solid var(--line-2); border-radius: 999px; overflow: hidden; }
+.oc-btn { border: 0; background: transparent; color: var(--text-3); font-size: 12px; padding: 3px 9px; }
+.oc-btn + .oc-btn { border-left: 1px solid var(--line-2); }
+.oc-btn:hover { color: var(--text); background: var(--bg-hover); }
+.oc-btn.on.won { background: color-mix(in srgb, var(--green) 18%, transparent); color: var(--green); }
+.oc-btn.on.lost { background: color-mix(in srgb, var(--red) 16%, transparent); color: var(--red); }
+.oc-btn.on.open { background: var(--bg-hover); color: var(--text); }
+.wins-sync { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-3); margin: -6px 0 16px; }
+.wins-sync .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+.wins-sync .dot.busy { background: var(--amber); animation: live-pulse 1.4s infinite; }
+.wins-sync .dot.bad { background: var(--red); }
+.tabs-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.wins-sum { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 16px; }
+.ws { border: 1px solid var(--line); background: var(--card); border-radius: 12px; padding: 12px 12px 10px; display: flex; flex-direction: column; gap: 3px; }
+.ws b { font-family: var(--font-head, inherit); font-size: 22px; color: var(--text); }
+.ws span { font-size: 11.5px; color: var(--text-3); line-height: 1.35; }
+.ws.won b { color: var(--green); } .ws.lost b { color: var(--red); }
+.wins-table { display: grid; gap: 4px; margin-bottom: 20px; }
+.wt-row { display: grid; grid-template-columns: 1.6fr 1fr 1fr; gap: 14px; align-items: center; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+.wt-label { font-size: 13px; color: var(--text); display: flex; flex-direction: column; gap: 3px; }
+.wt-sub { font-size: 11.5px; color: var(--text-3); }
+.wt-cell { display: flex; flex-direction: column; gap: 4px; }
+.wt-cell small { font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.wb { display: block; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.wb i { display: block; height: 100%; border-radius: 3px; }
+.wb.won i { background: var(--green); } .wb.lost i { background: var(--red); }
+.w-tag { align-self: flex-start; font-size: 10.5px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--bg-hover); color: var(--text-3); }
+.w-tag.good { background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); }
+.w-tag.bad { background: color-mix(in srgb, var(--red) 14%, transparent); color: var(--red); }
+.beat-stat { font-size: 11px; color: var(--text-3); margin-left: 8px; }
+.beat-stat.good { color: var(--green); } .beat-stat.bad { color: var(--red); }
+@media (max-width: 900px) { .wins-sum { grid-template-columns: repeat(2, 1fr); } }

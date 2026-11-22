@@ -90,7 +90,7 @@ function callRows(meetings, { showOwner = true } = {}) {
           onmousedown: (e) => e.stopPropagation(),
           onclick: (e) => { e.stopPropagation(); e.preventDefault(); toggleSelected(c.id); } })),
       h('span', { class: 'ci-main' },
-        h('span', { class: 'ci-title' }, liveNow ? h('i', { class: 'live-dot' }) : null, c.visibility === 'private' ? h('span', { class: 'lock inline', html: ICON.lock }) : null, c.title || 'Untitled call'),
+        h('span', { class: 'ci-title' }, liveNow ? h('i', { class: 'live-dot' }) : null, c.outcome === 'won' || c.outcome === 'lost' ? h('span', { class: `oc-pill ${c.outcome}` }, c.outcome === 'won' ? 'Won' : 'Lost') : null, c.visibility === 'private' ? h('span', { class: 'lock inline', html: ICON.lock }) : null, c.title || 'Untitled call'),
         sub ? h('span', { class: 'ci-sub' }, sub) : null),
       h('span', { class: 'ci-time' }, timeOf(c.startedAt)),
       rowActions(c));

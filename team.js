@@ -748,6 +748,69 @@ async function renderFolders() {
 }
 document.addEventListener('click', () => { if (menuFor || pickerFor) { menuFor = null; pickerFor = null; renderFolders(); } });
 
+// ---- What wins -------------------------------------------------------------------------
+// Won sales calls next to lost ones, per preset: which beats, objections and habits
+// actually go with closing. Outcomes come from Salesforce on their own.
+
+function outcomePicker(c) {
+  if (!authState.user || c.mode === 'notes' && !c.outcome) return null;
+  const wrap = h('span', { class: 'oc-pick', title: c.outcomeSource === 'manual' ? 'Set by hand' : c.outcomeSource === 'salesforce' ? 'From Salesforce (click to change)' : 'Did this deal close?' });
+  const draw = (cur) => wrap.replaceChildren(...[['won', 'Won'], ['lost', 'Lost'], ['open', 'Open']].map(([v, label]) => h('button', { class: `oc-btn ${cur === v ? `on ${v}` : ''}`, onclick: async () => {
+    const next = cur === v ? null : v;
+    const r = await call('calls:outcome', { ids: [c.id], outcome: next });
+    if (!r.ok) return alert(r.error);
+    c.outcome = next; draw(next);
+  } }, label)));
+  draw(c.outcome);
+  return wrap;
+}
+
+let winsPreset = null;
+async function renderWins() {
+  const w = await call('wins:get');
+  if (route.view !== 'wins') return;
+  if (!w.presets.length) { $view.replaceChildren(h('h1', { class: 'page' }, 'What wins'), h('p', { class: 'sub' }, 'Make a coaching preset first.')); return; }
+  if (!winsPreset || !w.presets.some((p) => p.id === winsPreset)) winsPreset = w.presets[0].id;
+  const p = w.presets.find((x) => x.id === winsPreset);
+  const st = w.stats[p.id] || { won: 0, lost: 0, beats: [], objections: [] };
+  const enough = st.won >= w.minEach && st.lost >= w.minEach;
+  const pct = (r) => (r && r.n ? `${r.k}/${r.n}` : '–');
+  const bar = (r, kind) => h('span', { class: `wb ${kind}` }, h('i', { style: `width:${r && r.n ? Math.round((100 * r.k) / r.n) : 0}%` }));
+  const tag = (gap, nOk) => (!nOk || gap == null ? null : gap >= 30 ? h('span', { class: 'w-tag good' }, 'Goes with wins') : gap <= -20 ? h('span', { class: 'w-tag bad' }, 'Goes with losses') : Math.abs(gap) < 10 ? h('span', { class: 'w-tag' }, 'No difference') : null);
+  const ago = (t) => { if (!t) return 'not yet'; const m = Math.round((Date.now() - Date.parse(t)) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
+  const counted = w.rows.filter((r) => (r.outcome === 'won' || r.outcome === 'lost') && r.kind !== 'client' && r.kind !== 'other' && r.analyzed.includes(p.id));
+  const beats = [...st.beats].sort((a, b) => (b.gap ?? -999) - (a.gap ?? -999));
+  $view.replaceChildren(
+    h('h1', { class: 'page' }, 'What wins'),
+    h('p', { class: 'sub' }, 'Won sales calls next to lost ones: which beats, objections and habits actually go with closing. Outcomes come from Salesforce by themselves; client calls (reviews, onboarding) are left out.'),
+    h('div', { class: 'wins-sync' }, h('span', { class: `dot ${w.sync.running ? 'busy' : w.sync.error ? 'bad' : 'ok'}` }),
+      w.sync.running ? 'Updating from Salesforce…' : w.sync.error ? `Last update failed: ${w.sync.error}` : `Updated from Salesforce ${ago(w.sync.at)}${w.sync.web ? '' : ' · every 6 hours'}`,
+      !WEB && authState.user?.role === 'admin' && !w.sync.running ? h('button', { class: 'link-btn', onclick: async () => { await call('wins:sync'); setTimeout(renderWins, 300); } }, 'Update now') : null),
+    w.presets.length > 1 ? h('div', { class: 'tabs-row' }, w.presets.map((x) => h('button', { class: `chip-btn ${x.id === p.id ? 'on' : ''}`, onclick: () => { winsPreset = x.id; renderWins(); } }, x.name))) : null,
+    h('div', { class: 'wins-sum' },
+      h('div', { class: 'ws won' }, h('b', {}, st.won), h('span', {}, 'won sales calls')),
+      h('div', { class: 'ws lost' }, h('b', {}, st.lost), h('span', {}, 'lost')),
+      h('div', { class: 'ws' }, h('b', {}, st.dream?.won ?? '–'), h('span', {}, `outcome selling, won (lost ${st.dream?.lost ?? '–'})`)),
+      h('div', { class: 'ws' }, h('b', {}, st.talk?.won != null ? `${st.talk.won}%` : '–'), h('span', {}, `rep talk share, won (lost ${st.talk?.lost != null ? `${st.talk.lost}%` : '–'})`)),
+      h('div', { class: 'ws' }, h('b', {}, pct(st.signer?.won)), h('span', {}, `signer on the call, won (lost ${pct(st.signer?.lost)})`))),
+    !enough ? h('div', { class: 'banner warn' }, `Early signal: ${st.won} won and ${st.lost} lost sales calls so far. Treat these as hints; the live card starts using them at ${w.minEach} of each, and it gets sharper as deals close.`) : null,
+    h('div', { class: 'section-head' }, h('h2', {}, `Beats · ${p.name}`)),
+    h('div', { class: 'wins-table' }, beats.map((b) => h('div', { class: 'wt-row' },
+      h('span', { class: 'wt-label' }, b.label, tag(b.gap, b.won.n >= 2 && b.lost.n >= 2)),
+      h('span', { class: 'wt-cell' }, bar(b.won, 'won'), h('small', {}, `won ${pct(b.won)}`)),
+      h('span', { class: 'wt-cell' }, bar(b.lost, 'lost'), h('small', {}, `lost ${pct(b.lost)}`))))),
+    st.objections.length ? h('div', { class: 'section-head' }, h('h2', {}, 'Objections')) : null,
+    st.objections.length ? h('div', { class: 'wins-table' }, st.objections.map((o) => h('div', { class: 'wt-row' },
+      h('span', { class: 'wt-label' }, o.title, h('small', { class: 'wt-sub' }, `answered well: won ${pct(o.answeredWon)} · lost ${pct(o.answeredLost)}`)),
+      h('span', { class: 'wt-cell' }, bar(o.won, 'won'), h('small', {}, `came up, won ${pct(o.won)}`)),
+      h('span', { class: 'wt-cell' }, bar(o.lost, 'lost'), h('small', {}, `lost ${pct(o.lost)}`))))) : null,
+    h('div', { class: 'section-head' }, h('h2', {}, `Calls counted · ${counted.length}`)),
+    counted.length ? h('div', { class: 'folder-list' }, counted.map((r) => h('button', { class: 'folder-call', onclick: () => go({ view: 'call', id: r.id }) },
+      h('span', { class: 'grow' }, h('b', {}, h('span', { class: `oc-pill ${r.outcome}` }, r.outcome === 'won' ? 'Won' : 'Lost'), ' ', r.title || 'Untitled call'),
+        h('span', {}, [dayLabel(r.startedAt), r.owner, r.source === 'manual' ? 'set by hand' : 'from Salesforce'].filter(Boolean).join(' · '))))))
+      : h('div', { class: 'placeholder' }, w.sync.running ? 'Reading the calls… this takes a few minutes the first time.' : 'No won or lost sales calls analyzed for this preset yet.'));
+}
+
 // Archive and Deleted, under the spaces. Drop calls on them, too.
 function binRow(view, label, icon) {
   const row = h('div', { class: `folder-row bin-row ${route.view === view ? 'on' : ''}`, onclick: () => go({ view }) },

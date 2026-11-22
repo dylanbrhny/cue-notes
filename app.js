@@ -46,6 +46,7 @@ const ICON = {
   archive: '<svg viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M3 6v6a1.5 1.5 0 0 0 1.5 1.5h7A1.5 1.5 0 0 0 13 12V6M6.5 8.8h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
   unarchive: '<svg viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M3 6v6a1.5 1.5 0 0 0 1.5 1.5h7A1.5 1.5 0 0 0 13 12V6M8 12V8.2M6.4 9.6L8 8l1.6 1.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   trash: '<svg viewBox="0 0 16 16" fill="none"><path d="M3 4.5h10M6.5 4.5V3.2c0-.4.3-.7.7-.7h1.6c.4 0 .7.3.7.7v1.3M4.3 4.5l.6 8.1c.1.8.7 1.4 1.5 1.4h3.2c.8 0 1.4-.6 1.5-1.4l.6-8.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  trophy: '<svg viewBox="0 0 16 16" fill="none"><path d="M5 2.5h6v3.2a3 3 0 0 1-6 0zM5 3.5H3a2 2 0 0 0 2 2.6M11 3.5h2a2 2 0 0 1-2 2.6M8 8.7v2.3M5.5 13.5h5M6.3 13.5c0-1.3.7-2.5 1.7-2.5s1.7 1.2 1.7 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   shield: '<svg viewBox="0 0 16 16" fill="none"><path d="M8 1.8l5 2v3.9c0 3.1-2.1 5.6-5 6.5-2.9-.9-5-3.4-5-6.5V3.8z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.8 8l1.6 1.6 2.9-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   plus: '<svg viewBox="0 0 16 16" fill="none"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
 };
@@ -144,7 +145,7 @@ function renderNav() {
     title: n ? `${n} call${n === 1 ? '' : 's'} live now` : 'Nobody is on a call',
     onclick: () => go({ view: 'watch' }),
   }, h('span', { html: ICON.live, style: 'display:inline-grid' }), 'Live', n ? h('span', { class: 'live-count' }, n) : null) : null;
-  $nav.replaceChildren(item('home', 'Home', 'calls'), live, authState.user ? item('ask', 'Ask Cue', 'sparkle') : null, item('presets', 'Presets', 'presets'), item('settings', 'Settings', 'settings'),
+  $nav.replaceChildren(item('home', 'Home', 'calls'), live, authState.user ? item('ask', 'Ask Cue', 'sparkle') : null, authState.user ? item('wins', 'What wins', 'trophy') : null, item('presets', 'Presets', 'presets'), item('settings', 'Settings', 'settings'),
     authState.user?.role === 'admin' ? item('admin', 'Admin', 'shield') : null);
 }
 
@@ -230,6 +231,7 @@ async function renderView() {
   if (v === 'monitor') return renderMonitor(route.id);
   if (v === 'watch') return renderWatch();
   if (v === 'archive') return renderArchive();
+  if (v === 'wins') return renderWins();
   if (v === 'trash') return renderTrash();
   if (v === 'admin') return renderAdmin();
   if (v === 'folder') return renderFolder(route.id);
@@ -446,6 +448,7 @@ async function renderCall(id) {
     h('div', { class: 'call-top' },
       h('span', { class: 'grow' }),
       folderPicker(c),
+      outcomePicker(c),
       privacyToggle(c),
       shareBtn,
       menuWrap),
@@ -624,8 +627,11 @@ async function renderPresetsInner() {
       p.kind === 'notes' ? null : field('Longest monologue before a nudge (seconds)', numIn(p.coaching?.monologue_seconds, teamCoach?.monologue_seconds, (v) => { const c = pc(); if (v == null) delete c.monologue_seconds; else c.monologue_seconds = v; }),
         'Empty uses the team setting.')));
 
+  const wins = authState.user ? await call('wins:get').catch(() => null) : null;
+  const pst = wins?.stats?.[p.id];
+  const beatStat = (id) => { const b = pst?.beats.find((x) => x.id === id); return b && (b.won.n || b.lost.n) ? h('span', { class: `beat-stat ${b.gap >= 30 ? 'good' : b.gap <= -20 ? 'bad' : ''}`, title: 'From won and lost sales calls (What wins)' }, `Won ${b.won.k}/${b.won.n} · Lost ${b.lost.k}/${b.lost.n}`) : null; };
   const itemBlocks = p.checklist.map((it, i) => h('div', { class: 'editor-block' },
-    h('div', { class: 'bar' }, h('span', { class: 'n' }, `Beat ${i + 1}`),
+    h('div', { class: 'bar' }, h('span', { class: 'n' }, `Beat ${i + 1}`), beatStat(it.id),
       h('button', { class: 'link-btn', title: 'Move up', onclick: () => move(p.checklist, i, -1) }, '↑'),
       h('button', { class: 'link-btn', title: 'Move down', onclick: () => move(p.checklist, i, 1) }, '↓'),
       h('button', { class: 'link-btn danger', onclick: () => { p.checklist.splice(i, 1); touch(); renderPresets(); } }, 'Remove')),
@@ -815,6 +821,7 @@ function drawPreviewBar(info) {
   previewBar = bar;
 }
 window.cue.on('preview:changed', drawPreviewBar);
+window.cue.on('wins:changed', () => { if (route.view === 'wins') renderWins(); });
 
 window.cue.on('live:state', (st) => {
   if (st?.preview) return; // the preset preview only drives the call card

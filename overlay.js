@@ -79,7 +79,7 @@ function structureKey() {
   const s = state.snapshot;
   return JSON.stringify([...base, state.callMode, state.title, state.warning, state.setupWarning, s.presetName, state.askEnd && state.askEnd.at, state.sharingWhole, state.shareTip,
     s.teamNudge && s.teamNudge.at, s.pitchNudge && s.pitchNudge.at,
-    s.items.map((i) => [i.id, i.done]), s.goodNow, state.talk && [state.talk.me, state.talk.lately], state.coachNudge && state.coachNudge.at, showBook, bookOpen, s.objection && [s.objection.id, s.objection.at]]);
+    s.items.map((i) => [i.id, i.done]), s.goodNow, state.winHint, state.talk && [state.talk.me, state.talk.lately], state.coachNudge && state.coachNudge.at, showBook, bookOpen, s.objection && [s.objection.id, s.objection.at]]);
 }
 
 function update() {
@@ -265,6 +265,7 @@ function nextBeat(open) {
   return h('div', { class: 'next' },
     good ? h('div', { class: 'label good' }, 'Good moment to') : h('div', { class: 'label' }, `Still to cover · ${open.length}`),
     good ? line(good, true) : null,
+    good && state.winHint ? h('div', { class: 'win-hint' }, state.winHint) : null,
     ...(good ? rest.slice(0, 2) : rest.slice(0, 3)).map((i) => line(i, false)),
     (good ? rest.length > 2 : rest.length > 3) ? h('div', { class: 'then' }, `+${rest.length - (good ? 2 : 3)} more`) : null);
 }
