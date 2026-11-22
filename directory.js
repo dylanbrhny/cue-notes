@@ -78,7 +78,8 @@ function callRows(meetings, { showOwner = true } = {}) {
       h('span', { class: 'ci-main' },
         h('span', { class: 'ci-title' }, c.status === 'live' ? h('i', { class: 'live-dot' }) : null, c.visibility === 'private' ? h('span', { class: 'lock inline', html: ICON.lock }) : null, c.title || 'Untitled call'),
         sub ? h('span', { class: 'ci-sub' }, sub) : null),
-      h('span', { class: 'ci-time' }, timeOf(c.startedAt)));
+      h('span', { class: 'ci-time' }, timeOf(c.startedAt)),
+      rowActions(c));
     if (authState.user) makeDraggable(row, 'call', c.id);
     out.push(row);
   }

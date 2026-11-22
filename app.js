@@ -43,6 +43,10 @@ const ICON = {
   folder: '<svg viewBox="0 0 16 16" fill="none"><path d="M2.5 4.5a1.5 1.5 0 0 1 1.5-1.5h2.4l1.4 1.6H12a1.5 1.5 0 0 1 1.5 1.5v5.4a1.5 1.5 0 0 1-1.5 1.5H4a1.5 1.5 0 0 1-1.5-1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
   live: '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="1.8" fill="currentColor"/><path d="M5.2 5.2a4 4 0 0 0 0 5.6M10.8 5.2a4 4 0 0 1 0 5.6M3.3 3.3a6.6 6.6 0 0 0 0 9.4M12.7 3.3a6.6 6.6 0 0 1 0 9.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
   sparkle: '<svg viewBox="0 0 16 16" fill="none"><path d="M8 2.5l1.3 3.2 3.2 1.3-3.2 1.3L8 11.5 6.7 8.3 3.5 7l3.2-1.3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M12.5 11v3M11 12.5h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
+  archive: '<svg viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M3 6v6a1.5 1.5 0 0 0 1.5 1.5h7A1.5 1.5 0 0 0 13 12V6M6.5 8.8h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
+  unarchive: '<svg viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M3 6v6a1.5 1.5 0 0 0 1.5 1.5h7A1.5 1.5 0 0 0 13 12V6M8 12V8.2M6.4 9.6L8 8l1.6 1.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  trash: '<svg viewBox="0 0 16 16" fill="none"><path d="M3 4.5h10M6.5 4.5V3.2c0-.4.3-.7.7-.7h1.6c.4 0 .7.3.7.7v1.3M4.3 4.5l.6 8.1c.1.8.7 1.4 1.5 1.4h3.2c.8 0 1.4-.6 1.5-1.4l.6-8.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  shield: '<svg viewBox="0 0 16 16" fill="none"><path d="M8 1.8l5 2v3.9c0 3.1-2.1 5.6-5 6.5-2.9-.9-5-3.4-5-6.5V3.8z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.8 8l1.6 1.6 2.9-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   plus: '<svg viewBox="0 0 16 16" fill="none"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
 };
 
@@ -140,7 +144,8 @@ function renderNav() {
     title: n ? `${n} call${n === 1 ? '' : 's'} live now` : 'Nobody is on a call',
     onclick: () => go({ view: 'watch' }),
   }, h('span', { html: ICON.live, style: 'display:inline-grid' }), 'Live', n ? h('span', { class: 'live-count' }, n) : null) : null;
-  $nav.replaceChildren(item('home', 'Home', 'calls'), live, authState.user ? item('ask', 'Ask Cue', 'sparkle') : null, item('presets', 'Presets', 'presets'), item('settings', 'Settings', 'settings'));
+  $nav.replaceChildren(item('home', 'Home', 'calls'), live, authState.user ? item('ask', 'Ask Cue', 'sparkle') : null, item('presets', 'Presets', 'presets'), item('settings', 'Settings', 'settings'),
+    authState.user?.role === 'admin' ? item('admin', 'Admin', 'shield') : null);
 }
 
 async function renderList() {
@@ -204,13 +209,13 @@ function renderWaiting() {
     h('img', { class: 'signin-logo', src: 'assets/logo.svg', alt: '' }),
     h('h1', { class: 'page' }, revoked ? 'This computer was removed' : d ? 'Waiting for approval' : 'Checking this computer…'),
     h('p', { class: 'sub' }, revoked
-      ? 'An admin removed this computer from Cue. Ask Dylan to approve it again in Settings → Devices.'
-      : d ? `For safety, each computer has to be approved once. Dylan can approve “${d.name}” in Cue → Settings → Devices. This page opens by itself as soon as he does.`
+      ? 'An admin removed this computer from Cue. Ask Dylan to approve it again in Admin → Devices.'
+      : d ? `For safety, each computer has to be approved once. Dylan can approve “${d.name}” in Cue → Admin → Devices. This page opens by itself as soon as he does.`
         : 'One moment while Cue checks this computer is allowed.'),
     d && !revoked ? h('div', { class: 'row', style: 'gap:10px;justify-content:center' }, h('span', { class: 'spin' }), h('span', { class: 'saved' }, 'Waiting…')) : null,
     h('div', { class: 'row', style: 'gap:10px;justify-content:center;margin-top:18px' },
       h('button', { class: 'btn primary', onclick: async () => { out.textContent = 'Checking…'; await call('computer:check'); authState = await call('auth:state'); out.textContent = ''; renderNav(); renderFolders(); renderView(); } }, 'Check again'),
-      h('button', { class: 'btn', onclick: async () => { await call('auth:signOut'); authState = await call('auth:state'); renderAccount(); renderFolders(); go({ view: 'home' }); } }, 'Sign out')),
+      h('button', { class: 'btn allow', onclick: async () => { await call('auth:signOut'); authState = await call('auth:state'); renderAccount(); renderFolders(); go({ view: 'home' }); } }, 'Sign out')),
     out));
 }
 
@@ -224,6 +229,9 @@ async function renderView() {
   if (v === 'call') return renderCall(route.id);
   if (v === 'monitor') return renderMonitor(route.id);
   if (v === 'watch') return renderWatch();
+  if (v === 'archive') return renderArchive();
+  if (v === 'trash') return renderTrash();
+  if (v === 'admin') return renderAdmin();
   if (v === 'folder') return renderFolder(route.id);
   if (v === 'space') return renderSpace(route.id);
   if (v === 'companies') return renderCompanies();
@@ -395,7 +403,10 @@ async function renderCall(id) {
     menuOpenHere ? h('div', { class: 'pop menu-pop right' },
       menuItem(c.aiNotes ? 'Rewrite notes' : 'Write notes with AI', rewrite),
       authState.user ? menuItem('Attach files', attach) : null,
-      menuItem('Delete call', async () => { if (!confirm('Delete this call and its notes? This cannot be undone.')) return; await call('calls:delete', id); go({ view: 'home' }); }, true)) : null);
+      authState.user && c.status !== 'live' && c.status !== 'writing' ? menuItem(c.archivedAt ? 'Unarchive' : 'Archive', () => archiveCalls([id], !c.archivedAt)) : null,
+      authState.user
+        ? menuItem('Delete call', () => trashCalls([id]), true)
+        : menuItem('Delete call', async () => { if (!confirm('Delete this call and its notes? This cannot be undone.')) return; await call('calls:delete', id); go({ view: 'home' }); }, true)) : null);
   drawMenu();
   document.addEventListener('click', () => { if (menuOpenHere) { menuOpenHere = false; drawMenu(); } }, { once: true });
 
@@ -467,7 +478,19 @@ async function renderCall(id) {
 
 let presetEditing = null;
 
+// Teammates can read the presets; only the admin edits them.
 async function renderPresets() {
+  const locked = !!authState.user && authState.user.role !== 'admin';
+  if (locked && presetEditing === '__ai') presetEditing = null;
+  await renderPresetsInner();
+  if (!locked) return;
+  $view.querySelectorAll('.ai-tab').forEach((el) => el.remove());
+  $view.querySelectorAll('.preset-tab').forEach((el) => { if (/New preset/.test(el.textContent)) el.remove(); });
+  $view.querySelectorAll('input, select, textarea, button:not(.preset-tab), [contenteditable="true"]').forEach((el) => { if (el.isContentEditable) el.contentEditable = 'false'; else el.disabled = true; });
+  $view.querySelector('h1.page')?.after(h('div', { class: 'banner' }, 'Only Dylan can change presets. You can read them here.'));
+}
+
+async function renderPresetsInner() {
   const presets = presetsCache = await call('presets:get');
   const settings = await call('settings:get');
   if (presetEditing !== '__ai' && (!presetEditing || !presets.some((p) => p.id === presetEditing))) presetEditing = presets[0]?.id;
@@ -630,6 +653,14 @@ function field(label, control, hint) {
 // Settings
 // ---------------------------------------------------------------------------
 
+// Teammates see their settings but can't change them (the theme is theirs to pick).
+function lockSettings(root) {
+  root.querySelectorAll('.panel:not([data-open])').forEach((p) => {
+    p.classList.add('locked');
+    p.querySelectorAll('input, select, textarea, button:not(.allow)').forEach((el) => { el.disabled = true; });
+  });
+}
+
 async function renderSettings() {
   const s = await call('settings:get');
   const presets = await call('presets:get');
@@ -655,10 +686,12 @@ async function renderSettings() {
   const mod = info.platform === 'darwin' ? 'Cmd' : 'Ctrl';
 
   const team = await teamSettingsPanels(s);
+  const locked = !!authState.user && authState.user.role !== 'admin';
   $view.replaceChildren(
     h('h1', { class: 'page' }, 'Settings'),
     h('p', { class: 'sub' }, WEB ? 'Cue on the web: everything except recording calls. Recording, the call widget and audio live in the desktop app.' : 'Keys are stored encrypted on this computer and only sent to ElevenLabs and Anthropic.'),
-    h('div', { class: 'panel' }, h('h3', {}, 'Appearance'),
+    locked ? h('div', { class: 'banner' }, 'Only Dylan can change Cue’s settings. You can pick your own theme.') : null,
+    h('div', { class: 'panel', 'data-open': '' }, h('h3', {}, 'Appearance'),
       h('div', { class: 'theme-pick' }, [
         ['synapse', 'Synapse', '#070b16', ['#4a9eff', '#34d399']],
         ['dark', 'Dark', '#1c1b19', ['#ecebe6', '#7cc196']],
@@ -667,7 +700,7 @@ async function renderSettings() {
         h('span', { class: 'sw', style: `background:${bg}` }, h('i', { style: `width:38%;background:${dots[0]}` }), h('i', { style: `width:18%;background:${dots[1]}` })),
         label)))),
     ...team,
-    await keysPanel(s, keyInput, save, out),
+    authState.user?.role === 'admin' ? null : await keysPanel(s, keyInput, save, out),
     WEB ? null : h('div', { class: 'panel' }, h('h3', {}, 'Audio'),
       field('Microphone', micSelect),
       field('Language', h('select', { onchange: (e) => save({ language: e.target.value }) },
@@ -679,7 +712,7 @@ async function renderSettings() {
       info.platform === 'darwin' ? (() => {
         const out = h('span', { class: 'grow', style: 'font-size:12.5px;color:var(--text-3)' }, 'Play a video with someone talking, then test. macOS may ask to let Cue record system audio: click Allow.');
         return h('div', { class: 'row', style: 'margin-top:-4px' }, out,
-          h('button', { class: 'btn', onclick: async (e) => {
+          h('button', { class: 'btn allow', onclick: async (e) => {
             e.target.disabled = true; e.target.textContent = 'Listening 5 s…';
             const r = await call('audio:testSystem');
             e.target.disabled = false; e.target.textContent = 'Test call audio';
@@ -687,13 +720,13 @@ async function renderSettings() {
               : r.error ? `Didn’t work: ${r.error}`
               : 'Heard only silence. Is something playing? If so, allow Cue under System Settings → Privacy & Security → Screen & System Audio Recording → System Audio Recording Only.';
           } }, 'Test call audio'),
-          h('button', { class: 'btn', onclick: () => call('app:openScreenSettings') }, 'Open Settings'));
+          h('button', { class: 'btn allow', onclick: () => call('app:openScreenSettings') }, 'Open Settings'));
       })() : null),
     WEB ? null : h('div', { class: 'panel' }, h('h3', {}, 'Calls'),
       toggle('detectCalls', 'Notice when a call starts', info.detectSupported ? 'Watches for apps using the microphone and for open meeting windows (Meet, Zoom, Teams, Slack huddles), like Granola.' : `Windows only. On this computer, start calls from the sidebar, the menu bar icon, or ${mod}+${info.platform === 'darwin' ? 'Option' : 'Alt'}+C.`, !info.detectSupported),
       info.platform === 'darwin' ? h('div', { class: 'row', style: 'margin-top:-4px' },
         h('span', { class: 'grow', style: 'font-size:12.5px;color:var(--text-3)' }, info.windowAccess ? 'Meeting windows: watching (Accessibility allowed)' : 'Meeting windows: off. Allow Cue under Accessibility so a meeting is spotted even with your mic muted.'),
-        info.windowAccess ? null : h('button', { class: 'btn', onclick: () => call('app:openAxSettings') }, 'Open Settings')) : null,
+        info.windowAccess ? null : h('button', { class: 'btn allow', onclick: () => call('app:openAxSettings') }, 'Open Settings')) : null,
       toggle('autoStart', 'Start cues without asking', 'Skips the "Call detected" card and uses the default preset.'),
       field('Default preset', h('select', { onchange: (e) => save({ defaultPresetId: e.target.value }) },
         presets.map((p) => h('option', { value: p.id, selected: p.id === s.defaultPresetId }, p.name))))),
@@ -704,6 +737,7 @@ async function renderSettings() {
       toggle('launchAtLogin', 'Open Cue when the computer starts', 'Runs quietly in the tray so it is ready for the first call.'),
       h('div', { class: 'field', style: 'margin-top:10px' }, h('span', { class: 'lbl' }, 'Data folder'), h('div', { class: 'hint' }, info.dataDir || ''))),
   );
+  if (locked) lockSettings($view);
 }
 
 // ---------------------------------------------------------------------------
@@ -713,11 +747,11 @@ window.cue.on('route', (r) => { routedByMain = true; go(r); });
 window.cue.on('calls:changed', () => { renderList(); if (route.view === 'call') renderCall(route.id); if (route.view === 'home') renderHome(); });
 window.cue.on('team:changed', () => { renderList(); renderTeamLive(); });
 window.cue.on('auth:changed', async () => { authState = await call('auth:state'); renderAccount(); renderNav(); renderTeamLive(); renderFolders(); presetsChanged(); renderView(); });
-window.cue.on('computers:changed', () => { if (route.view === 'settings') renderSettings(); });
+window.cue.on('computers:changed', () => { if (route.view === 'settings' || route.view === 'admin') renderView(); });
 window.cue.on('monitor:event', (e) => onMonitorEvent(e));
 window.cue.on('settings:changed', (s) => { applyTheme(s.theme); if (route.view === 'settings') renderSettings(); });
 window.cue.on('live:notes', (n) => { const el = document.getElementById('live-ai-notes'); if (el && n?.text) el.replaceChildren(h('div', { html: renderMd(n.text) })); });
-window.cue.on('calendar:changed', () => { if (route.view === 'settings') renderSettings(); });
+window.cue.on('calendar:changed', () => { if (route.view === 'settings' || route.view === 'admin') renderView(); });
 let lastUpdateStatus = null;
 window.cue.on('update:changed', (st) => { if (route.view === 'settings' && st.status !== lastUpdateStatus) renderSettings(); lastUpdateStatus = st.status; });
 window.cue.on('live:state', (st) => {

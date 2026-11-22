@@ -55,6 +55,8 @@ function drawSelBar() {
   const bar = h('div', { class: 'sel-bar' },
     h('b', {}, `${selectedCalls.size} call${selectedCalls.size === 1 ? '' : 's'} selected`),
     h('span', {}, 'Drag onto a folder, or'), move,
+    h('button', { class: 'link-btn', onclick: () => archiveCalls([...selectedCalls], route.view !== 'archive') }, route.view === 'archive' ? 'Unarchive' : 'Archive'),
+    h('button', { class: 'link-btn danger', onclick: () => trashCalls([...selectedCalls]) }, 'Delete'),
     h('button', { class: 'link-btn', onclick: clearSelection }, 'Clear'));
   if (selBar) selBar.replaceWith(bar); else document.body.append(bar);
   selBar = bar;
@@ -93,6 +95,11 @@ window.addEventListener('DOMContentLoaded', () => {
   });
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') clearSelection();
+    // Delete / Backspace moves the selected calls to Deleted (Undo is offered).
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedCalls.size && !e.target.closest('input, textarea, select, [contenteditable="true"]')) {
+      e.preventDefault();
+      trashCalls([...selectedCalls]);
+    }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a' && !e.target.closest('input, textarea, [contenteditable="true"]') && document.querySelector('.call-item[data-call]')) {
       e.preventDefault();
       document.querySelectorAll('.call-item[data-call]').forEach((el) => selectedCalls.add(el.dataset.call));

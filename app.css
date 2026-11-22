@@ -584,3 +584,37 @@ a.start-btn.web-get { display: flex; align-items: center; justify-content: cente
 .flash { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 1001; background: var(--text); color: var(--bg); font-size: 13px; padding: 8px 14px; border-radius: 999px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); animation: flash-in .18s ease-out; transition: opacity .3s, transform .3s; }
 .flash.out { opacity: 0; transform: translateX(-50%) translateY(6px); }
 @keyframes flash-in { from { opacity: 0; transform: translateX(-50%) translateY(6px); } }
+
+/* Hover actions on call rows: share, archive, delete */
+.call-item { position: relative; }
+.row-actions { display: none; flex: none; gap: 2px; margin-left: -4px; }
+.call-item:hover .row-actions, .call-item:focus-within .row-actions { display: inline-flex; }
+.call-item:hover .ci-time { display: none; }
+.ra-btn { width: 28px; height: 28px; display: inline-grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: var(--text-3); }
+.ra-btn svg { width: 15px; height: 15px; }
+.ra-btn:hover { background: color-mix(in srgb, var(--text) 9%, transparent); color: var(--text); }
+.ra-btn:last-child:hover { color: var(--red); }
+.ra-btn.busy { opacity: 0.5; }
+
+/* Archive / Deleted in the sidebar */
+.side-gap { height: 10px; }
+.bin-row { color: var(--text-2); }
+.bin-row .space-ico { display: inline-grid; width: 15px; height: 15px; color: var(--text-3); }
+.bin-row .space-ico svg { width: 15px; height: 15px; }
+.bin-row.drop { background: color-mix(in srgb, var(--accent, #4a9eff) 14%, transparent); }
+
+/* Deleted page */
+.trash-list { display: grid; gap: 6px; max-width: 820px; }
+.trash-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border: 1px solid var(--line); border-radius: 11px; background: var(--card); }
+.trash-row .grow { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.trash-row .grow b { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trash-row .grow span { font-size: 12px; color: var(--text-3); }
+.trash-days { font-size: 12px; color: var(--text-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.btn.danger-btn { color: var(--red); border-color: color-mix(in srgb, var(--red) 40%, transparent); }
+.flash { display: inline-flex; align-items: center; gap: 12px; }
+.flash-undo { border: 0; background: transparent; color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; padding: 0; font-size: 13px; }
+
+/* Settings a teammate can read but not change */
+.panel.locked { opacity: 0.72; }
+.panel.locked .btn.allow { opacity: 1; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }

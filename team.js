@@ -72,13 +72,14 @@ function renderWatch() {
   const rows = list.map((c) => {
     const timer = h('span', { class: 'lw-time' }, fmtDur(Date.now() - c.startedAt));
     timer.dataset.start = c.startedAt;
-    return h('button', { class: 'live-card', onclick: () => go(c.mine ? { view: 'live' } : { view: 'monitor', id: c.id }) },
+    const ownReal = c.mine && !/^Simulation · /.test(c.title || '');
+    return h('button', { class: 'live-card', onclick: () => go(ownReal ? { view: 'live' } : { view: 'monitor', id: c.id }) },
       h('span', { class: 'lw-dot' }),
       h('span', { class: 'grow' },
         h('b', {}, c.title || 'Call'),
         h('span', {}, [c.mine ? 'You' : c.owner || 'Teammate', c.presetName].filter(Boolean).join(' · '))),
       timer,
-      h('span', { class: 'btn primary' }, c.mine ? 'Open' : 'Watch live'));
+      h('span', { class: 'btn primary' }, ownReal ? 'Open' : 'Watch live'));
   });
   $view.replaceChildren(
     h('h1', { class: 'page' }, 'Live'),
@@ -202,28 +203,13 @@ async function teamSettingsPanels(s) {
     panels.push(h('div', { class: 'panel' }, h('h3', {}, 'Team account'),
       authState.user
         ? h('div', { class: 'row', style: 'margin-bottom:12px' }, h('span', { class: 'grow' }, `Signed in as ${authState.user.name} (${authState.user.email})`),
-          h('button', { class: 'btn', onclick: async () => { await call('auth:signOut'); authState = await call('auth:state'); renderAccount(); renderTeamLive(); go({ view: 'home' }); } }, 'Sign out'))
+          h('button', { class: 'btn allow', onclick: async () => { await call('auth:signOut'); authState = await call('auth:state'); renderAccount(); renderTeamLive(); go({ view: 'home' }); } }, 'Sign out'))
         : h('div', { class: 'row', style: 'margin-bottom:12px' }, h('span', { class: 'grow' }, 'Not signed in. Calls stay on this computer.'),
           h('button', { class: 'btn primary', onclick: () => { sessionStorage.removeItem('cue-offline'); renderSignIn(); } }, 'Sign in')),
       authState.user ? h('label', { class: 'toggle' },
         h('input', { type: 'checkbox', checked: !!s.notifyTeamCalls, onchange: (e) => call('settings:save', { notifyTeamCalls: e.target.checked }) }),
         h('span', { class: 'tx' }, h('b', {}, 'Tell me when a teammate starts a call'), h('span', {}, 'A notification with a link to watch it live.'))) : null));
   }
-
-  if (authState.user?.role === 'admin') panels.push(await adminPanel(), await devicesPanel(), await coachingPanel(), await shareDomainPanel());
-
-  // Who we are + how we sell
-  const ws = await call('workspace:get');
-  const profile = h('textarea', { rows: 5, value: ws.companyProfile, placeholder: 'Who we are, what we sell, who buys it, our pricing. Claude reads this on every call.' });
-  const knowledge = h('textarea', { rows: 8, value: ws.knowledge, placeholder: 'Leave empty to use the built-in Synapse closing playbook (sell the dream outcome, meeting math, in-house hire comparison).' });
-  const saved = h('span', { class: 'saved' });
-  const save = debounce(async () => { await call('workspace:save', { companyProfile: profile.value, knowledge: knowledge.value }); saved.textContent = ws.shared ? 'Saved for the team' : 'Saved'; setTimeout(() => { saved.textContent = ''; }, 1600); }, 600);
-  profile.addEventListener('input', save);
-  knowledge.addEventListener('input', save);
-  panels.push(h('div', { class: 'panel' }, h('div', { class: 'row', style: 'margin-bottom:12px' }, h('h3', { style: 'margin:0;flex:1' }, 'Who we are and how we sell'), saved),
-    field('Company profile', profile, ws.shared ? 'Shared with the team.' : 'Saved on this computer until you sign in.'),
-    field('Sales playbook', knowledge, ws.knowledge ? 'Your own playbook replaces the built-in one.' : `Using the built-in closing playbook (${Math.round((ws.bundledKnowledge || '').split(/\s+/).length / 10) * 10} words): sell the dream outcome, not features.`),
-    !ws.knowledge && ws.bundledKnowledge ? h('div', { class: 'row', style: 'margin:-4px 0 12px' }, h('button', { class: 'link-btn', onclick: () => { knowledge.value = ws.bundledKnowledge; save(); } }, 'Copy the built-in playbook here to edit it')) : null));
 
   // Calendar
   const cal = await call('calendar:status');
@@ -263,13 +249,12 @@ async function teamSettingsPanels(s) {
             h('div', { class: 'row', style: 'margin-top:10px' }, h('button', { class: 'btn primary', onclick: async () => { await call('calendar:connect'); renderSettings(); } }, 'Connect Google Calendar'))),
     cal.configured || WEB ? null : manual));
   if (WEB && !cal.configured) panels[panels.length - 1].append(h('div', { class: 'hint' }, 'Calendars are connected from the Cue desktop app.'));
-  if (authState.user?.role === 'admin') panels.push(await teamCalendarPanel());
 
   if (WEB) return panels; // connecting Claude and updates happen in the desktop app
   // Claude
   panels.push(h('div', { class: 'panel' }, h('h3', {}, 'Claude'),
     h('div', { class: 'hint', style: 'margin-bottom:10px;font-size:12.5px;color:var(--text-3);line-height:1.5' }, 'Let Claude search and read every team call, the same way it reads Granola today.'),
-    h('div', { class: 'row', style: 'margin-bottom:12px' }, h('button', { class: 'btn', disabled: !authState.user, onclick: async (e) => {
+    h('div', { class: 'row', style: 'margin-bottom:12px' }, h('button', { class: 'btn allow', disabled: !authState.user, onclick: async (e) => {
       e.target.disabled = true; e.target.textContent = 'Connecting…';
       const r = await call('claude:connect');
       e.target.textContent = r.ok ? 'Connected' : 'Connect Claude';
@@ -292,14 +277,50 @@ async function teamSettingsPanels(s) {
     error: `Couldn't check for updates: ${up.error || ''}`,
   }[up.status] || '';
   const upBtns = [];
-  if (up.status === 'ready') upBtns.push(h('button', { class: 'btn primary', onclick: async () => { const r = await call('update:install'); if (!r.ok) alert(r.error); } }, 'Restart to update'));
-  if (up.status === 'available' && info.platform === 'darwin') upBtns.push(h('button', { class: 'btn primary', onclick: async (e) => { e.target.disabled = true; e.target.textContent = 'Downloading…'; const r = await call('update:mac'); e.target.disabled = false; e.target.textContent = r.ok ? 'Opened' : 'Download update'; if (!r.ok) alert(r.error); } }, 'Download update'));
-  if (up.status !== 'off' && up.status !== 'downloading' && up.status !== 'ready') upBtns.push(h('button', { class: 'btn', onclick: async () => { await call('update:check'); renderSettings(); } }, 'Check now'));
+  if (up.status === 'ready') upBtns.push(h('button', { class: 'btn primary allow', onclick: async () => { const r = await call('update:install'); if (!r.ok) alert(r.error); } }, 'Restart to update'));
+  if (up.status === 'available' && info.platform === 'darwin') upBtns.push(h('button', { class: 'btn primary allow', onclick: async (e) => { e.target.disabled = true; e.target.textContent = 'Downloading…'; const r = await call('update:mac'); e.target.disabled = false; e.target.textContent = r.ok ? 'Opened' : 'Download update'; if (!r.ok) alert(r.error); } }, 'Download update'));
+  if (up.status !== 'off' && up.status !== 'downloading' && up.status !== 'ready') upBtns.push(h('button', { class: 'btn allow', onclick: async () => { await call('update:check'); renderSettings(); } }, 'Check now'));
   panels.push(h('div', { class: 'panel' }, h('h3', {}, 'Updates'),
     h('div', { class: 'hint', style: 'margin-bottom:10px;font-size:12.5px;color:var(--text-2);line-height:1.5' }, `Cue ${up.current || info.version}. ${upText}`),
     up.error && up.status !== 'error' ? h('div', { class: 'hint', style: 'margin-bottom:10px;font-size:12px;color:var(--amber)' }, up.error) : null,
     upBtns.length ? h('div', { class: 'row', style: 'margin-bottom:12px' }, ...upBtns) : null));
   return panels;
+}
+
+
+// ---------------------------------------------------------------------------
+// Admin (only Dylan): everything that changes Cue for the whole team
+// ---------------------------------------------------------------------------
+
+async function renderAdmin() {
+  if (authState.user?.role !== 'admin') return go({ view: 'settings' });
+  const panels = [];
+  panels.push(await simulatorPanel(), await devicesPanel(), await adminPanel());
+
+  // Who we are + how we sell
+  const ws = await call('workspace:get');
+  const profile = h('textarea', { rows: 5, value: ws.companyProfile, placeholder: 'Who we are, what we sell, who buys it, our pricing. Claude reads this on every call.' });
+  const knowledge = h('textarea', { rows: 8, value: ws.knowledge, placeholder: 'Leave empty to use the built-in Synapse closing playbook (sell the dream outcome, meeting math, in-house hire comparison).' });
+  const saved = h('span', { class: 'saved' });
+  const save = debounce(async () => { await call('workspace:save', { companyProfile: profile.value, knowledge: knowledge.value }); saved.textContent = ws.shared ? 'Saved for the team' : 'Saved'; setTimeout(() => { saved.textContent = ''; }, 1600); }, 600);
+  profile.addEventListener('input', save);
+  knowledge.addEventListener('input', save);
+  panels.push(h('div', { class: 'panel' }, h('div', { class: 'row', style: 'margin-bottom:12px' }, h('h3', { style: 'margin:0;flex:1' }, 'Who we are and how we sell'), saved),
+    field('Company profile', profile, ws.shared ? 'Shared with the team.' : 'Saved on this computer until you sign in.'),
+    field('Sales playbook', knowledge, ws.knowledge ? 'Your own playbook replaces the built-in one.' : `Using the built-in closing playbook (${Math.round((ws.bundledKnowledge || '').split(/\s+/).length / 10) * 10} words): sell the dream outcome, not features.`),
+    !ws.knowledge && ws.bundledKnowledge ? h('div', { class: 'row', style: 'margin:-4px 0 12px' }, h('button', { class: 'link-btn', onclick: () => { knowledge.value = ws.bundledKnowledge; save(); } }, 'Copy the built-in playbook here to edit it')) : null));
+
+  panels.push(await coachingPanel(), await teamCalendarPanel(), await shareDomainPanel());
+  const s = await call('settings:get');
+  const saveSetting = (patch) => call('settings:save', patch);
+  const keyInput = (k, placeholder) => h('input', { type: 'password', value: s[k], placeholder, autocomplete: 'off', spellcheck: 'false',
+    onfocus: (e) => { if (e.target.value.startsWith('••••')) e.target.value = ''; },
+    onchange: (e) => { const v = e.target.value.trim(); if (v) saveSetting({ [k]: v }); } });
+  panels.push(await keysPanel(s, keyInput, saveSetting, h('div', { class: 'test-out' })));
+  $view.replaceChildren(
+    h('h1', { class: 'page' }, 'Admin'),
+    h('p', { class: 'sub' }, 'Only you see this page. Changes here apply to everyone on the team; Grant and Christian can read team settings but can’t change them.'),
+    ...panels);
 }
 
 // ---------------------------------------------------------------------------
@@ -308,7 +329,7 @@ async function teamSettingsPanels(s) {
 
 async function keysPanel(s, keyInput, save, out) {
   const k = await call('keys:state');
-  const testRow = h('div', { class: 'row', style: 'margin-bottom:12px' }, h('button', { class: 'btn', onclick: async (e) => {
+  const testRow = h('div', { class: 'row', style: 'margin-bottom:12px' }, h('button', { class: 'btn allow', onclick: async (e) => {
     e.target.disabled = true; out.textContent = 'Testing…';
     const r = await call('settings:test');
     e.target.disabled = false;
@@ -360,7 +381,7 @@ async function teamCalendarPanel() {
     e.target.disabled = true; e.target.textContent = 'Waiting for Google…'; err.textContent = '';
     const r = await call('teamcal:connect');
     if (!r.ok) { err.textContent = r.error; e.target.disabled = false; e.target.textContent = 'Connect team calendars'; return; }
-    renderSettings();
+    renderView();
   } }, st.connected ? 'Reconnect' : 'Connect team calendars');
   return h('div', { class: 'panel' }, h('h3', {}, 'Team calendars'),
     h('p', { class: 'hint' }, st.connected
@@ -372,18 +393,56 @@ async function teamCalendarPanel() {
       h('span', { class: 'grow' }, h('b', {}, m.name), h('span', {}, ` ${m.email}`)),
       m.error ? h('span', { class: 'chip bad', title: m.error }, 'Not shared') : m.count != null ? h('span', { class: 'chip' }, `${m.count} meetings`) : h('span', { class: 'chip' }, 'Waiting')))) : null,
     h('div', { class: 'row' }, connect,
-      st.connected ? h('button', { class: 'btn', onclick: async (e) => { e.target.textContent = 'Syncing…'; await call('teamcal:sync'); renderSettings(); } }, 'Sync now') : null,
+      st.connected ? h('button', { class: 'btn', onclick: async (e) => { e.target.textContent = 'Syncing…'; await call('teamcal:sync'); renderView(); } }, 'Sync now') : null,
       st.connected ? h('span', { class: 'saved' }, `Last sync ${ago(st.lastSyncAt)}`) : null,
-      st.connected ? h('button', { class: 'link-btn danger', onclick: async () => { if (confirm('Disconnect team calendars for everyone?')) { await call('teamcal:disconnect'); renderSettings(); } } }, 'Disconnect') : null),
+      st.connected ? h('button', { class: 'link-btn danger', onclick: async () => { if (confirm('Disconnect team calendars for everyone?')) { await call('teamcal:disconnect'); renderView(); } } }, 'Disconnect') : null),
     st.available ? null : h('div', { class: 'hint' }, st.webOnly ? 'Connect or reconnect team calendars from the Cue desktop app.' : 'This build has no Google sign-in set up.'),
     err);
 }
 
 // Approved computers: each computer or browser has to be approved once.
+// Plays a scripted call through the real pipeline so every part of Cue can be
+// tried without a real prospect: the "Call detected" card, the widget, AI cues,
+// objections, coach tips, talk time, live notes, "Meeting over?" and the notes.
+async function simulatorPanel() {
+  if (WEB) return h('div', { class: 'panel' }, h('h3', {}, 'Simulator'), h('div', { class: 'hint' }, 'Run the simulator from the Cue desktop app: it drives the call widget on your screen.'));
+  const scripts = await call('sim:scripts');
+  const presets = await call('presets:get');
+  let pick = scripts[0]?.id || 'custom';
+  const scriptSel = h('select', { onchange: (e) => { pick = e.target.value; custom.hidden = pick !== 'custom'; syncPreset(); } },
+    scripts.map((x) => h('option', { value: x.id }, `${x.name} (${x.lines} lines)`)), h('option', { value: 'custom' }, 'Paste my own script…'));
+  const custom = h('textarea', { rows: 6, hidden: true, placeholder: 'REP: Thanks for jumping on, how do you find new customers today?\nMark: Mostly referrals.\nREP: …' });
+  const presetSel = h('select', {}, h('option', { value: '' }, 'Best fit for the script'), presets.map((p) => h('option', { value: p.id }, p.name)));
+  const syncPreset = () => { if (pick === 'notes') presetSel.value = (presets.find((p) => p.kind === 'notes') || {}).id || ''; };
+  const speed = h('select', {}, [[1, 'Real time'], [2, '2× faster'], [4, '4× faster'], [8, '8× faster']].map(([v, l]) => h('option', { value: v, selected: v === 2 }, l)));
+  const opt = (checked, title, desc) => { const box = h('input', { type: 'checkbox', checked }); return [box, h('label', { class: 'toggle' }, box, h('span', { class: 'tx' }, h('b', {}, title), h('span', {}, desc)))]; };
+  const [detect, detectRow] = opt(true, 'Start with the “Call detected” card', 'Like when a Meet or Zoom call opens. Click Start on the card to begin.');
+  const [leave, leaveRow] = opt(true, 'End with the other side leaving', 'Cue asks “Meeting over?” the moment they leave, then writes the notes.');
+  const [visible, visibleRow] = opt(false, 'Show it on Live', 'Teammates see it glow on their Live tab (titled “Simulation · …”) and can watch along. Off: only you see it, and the notes land in My notes.');
+  const status = h('div', { class: 'test-out' });
+  const run = h('button', { class: 'btn primary', onclick: async () => {
+    status.textContent = '';
+    run.disabled = true;
+    const r = await call('sim:start', { scriptId: pick === 'custom' ? null : pick, custom: pick === 'custom' ? custom.value : null, presetId: presetSel.value || null, speed: Number(speed.value), detect: detect.checked, endBy: leave.checked ? 'leave' : 'auto', visible: visible.checked });
+    run.disabled = false;
+    if (!r.ok) { status.textContent = r.error; return; }
+    status.replaceChildren(
+      h('span', {}, r.waiting ? 'The “Call detected” card is on your screen. Click Start on it. ' : 'Running. The widget is on your screen. '),
+      visible.checked ? h('button', { class: 'link-btn', onclick: () => go({ view: 'watch' }) }, 'Watch it on Live') : null);
+  } }, 'Run simulation');
+  return h('div', { class: 'panel' }, h('h3', {}, 'Simulator'),
+    h('div', { class: 'hint', style: 'margin-bottom:12px' }, 'Plays a scripted call through the real Cue: the call card, AI cues and objections, coach tips and talk time, live notes, “Meeting over?” and the finished notes. It uses the team’s AI keys like a real call (a few cents a run). Delete the call afterwards if you don’t want it.'),
+    field('Script', scriptSel), custom,
+    h('div', { class: 'grid-2' }, field('Preset', presetSel), field('Speed', speed)),
+    detectRow, leaveRow, visibleRow,
+    h('div', { class: 'row', style: 'margin:6px 0 4px;gap:12px' }, run, h('button', { class: 'btn', onclick: () => call('call:stop') }, 'End the running call')),
+    status);
+}
+
 async function devicesPanel() {
   const list = await call('computers:list');
   const msg = h('span', { class: 'saved' });
-  const act = async (id, status) => { const r = await call('computers:set', { id, status }); if (!r.ok) msg.textContent = r.error; renderSettings(); };
+  const act = async (id, status) => { const r = await call('computers:set', { id, status }); if (!r.ok) msg.textContent = r.error; renderView(); };
   const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 2 ? 'now' : m < 60 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
   const pending = list.filter((d) => d.status === 'pending');
   return h('div', { class: 'panel' }, h('div', { class: 'row' }, h('h3', { class: 'grow' }, 'Devices'), msg),
@@ -392,7 +451,7 @@ async function devicesPanel() {
     h('ul', { class: 'members devices' }, list.map((d) => h('li', { class: d.status },
       h('span', { class: 'avatar' }, d.platform === 'Web' ? '🌐' : d.platform === 'Mac' ? '⌘' : '⊞'),
       h('span', { class: 'grow' },
-        h('b', { title: 'Click to rename', style: 'cursor:text', onclick: async () => { const n = prompt('Name for this computer', d.name); if (n && n.trim() && n !== d.name) { await call('computers:rename', { id: d.id, name: n.trim() }); renderSettings(); } } }, d.name),
+        h('b', { title: 'Click to rename', style: 'cursor:text', onclick: async () => { const n = prompt('Name for this computer', d.name); if (n && n.trim() && n !== d.name) { await call('computers:rename', { id: d.id, name: n.trim() }); renderView(); } } }, d.name),
         h('span', {}, ` ${d.owner}${d.thisDevice ? ' · this computer' : ''} · seen ${ago(d.lastSeen)}`)),
       d.status === 'pending' ? h('button', { class: 'btn primary', onclick: () => act(d.id, 'approved') }, 'Approve') : null,
       d.status === 'revoked' ? h('span', { class: 'chip bad' }, 'Removed') : h('span', { class: 'chip' }, d.status === 'approved' ? 'Approved' : 'Waiting'),
@@ -445,14 +504,14 @@ async function adminPanel() {
       h('span', { class: 'saved', style: 'min-width:70px;text-align:right' }, m.joinedAt ? 'signed in' : 'not yet'),
       m.email === authState.user?.email ? null : h('button', { class: 'link-btn danger', onclick: async () => {
         if (!confirm(`Remove ${m.name} from the team? Their calls stay; they lose access.`)) return;
-        const r = await call('team:removeMember', m.email); if (!r.ok) alert(r.error); renderSettings();
+        const r = await call('team:removeMember', m.email); if (!r.ok) alert(r.error); renderView();
       } }, 'Remove')))),
     h('form', { class: 'row add-member', onsubmit: async (e) => {
       e.preventDefault(); err.textContent = '';
       if (!name.value.trim() || !/^\S+@\S+\.\S+$/.test(email.value.trim())) { err.textContent = 'Enter a name and an email.'; return; }
       const r = await call('team:setMember', { email: email.value, name: name.value, role: role.value });
       if (!r.ok) { err.textContent = r.error; return; }
-      renderSettings();
+      renderView();
     } }, name, email, role, h('button', { class: 'btn', type: 'submit' }, 'Add')),
     err,
     h('form', { class: 'row', style: 'margin:6px 0 12px', onsubmit: async (e) => {
@@ -681,10 +740,56 @@ async function renderFolders() {
   el.replaceChildren(
     h('div', { class: 'side-label row-label' }, h('span', { class: 'grow' }, 'Spaces'),
       h('button', { class: 'mini-btn', title: 'New space', 'aria-label': 'New space', html: ICON.plus, onclick: () => { addingSpace = true; renderFolders(); } })),
-    ...spaces.flatMap(spaceRow), newSpace);
+    ...spaces.flatMap(spaceRow), newSpace,
+    h('div', { class: 'side-gap' }),
+    binRow('archive', 'Archive', 'archive'), binRow('trash', 'Deleted', 'trash'));
   if (newSpace) setTimeout(() => newSpace.querySelector('input').focus(), 10);
 }
 document.addEventListener('click', () => { if (menuFor || pickerFor) { menuFor = null; pickerFor = null; renderFolders(); } });
+
+// Archive and Deleted, under the spaces. Drop calls on them, too.
+function binRow(view, label, icon) {
+  const row = h('div', { class: `folder-row bin-row ${route.view === view ? 'on' : ''}`, onclick: () => go({ view }) },
+    h('span', { class: 'chev-space' }), h('span', { class: 'space-ico', html: ICON[icon] }), h('span', { class: 'grow' }, label));
+  dropZone(row, () => {
+    const d = dragging; dragging = null;
+    if (d?.kind === 'call') view === 'trash' ? trashCalls(d.ids) : archiveCalls(d.ids, true);
+  }, (d) => d.kind === 'call');
+  return h('div', { class: 'folder-wrap' }, row);
+}
+
+async function renderArchive() {
+  const calls = await call('calls:archived');
+  $view.replaceChildren(
+    h('h1', { class: 'page' }, 'Archive'),
+    h('p', { class: 'hint', style: 'margin:0 0 18px;color:var(--text-3)' }, 'Calls you archived. They’re out of Home and the folders but still show up in search and for Claude. Right-click or hover a call to bring it back.'),
+    calls.length ? h('div', { class: 'call-items' }, callRows(calls)) : h('div', { class: 'live-empty' }, h('span', { class: 'le-ring', html: ICON.archive }), h('b', {}, 'Nothing archived'), h('span', {}, 'Hover a call and click the box icon to archive it.')));
+}
+
+async function renderTrash() {
+  const list = await call('trash:list');
+  const admin = authState.user?.role === 'admin';
+  const days = (t) => Math.max(0, Math.ceil((t - Date.now()) / 86_400_000));
+  const rows = list.map((m) => h('div', { class: 'trash-row' },
+    h('span', { class: 'grow' },
+      h('b', {}, m.title || 'Untitled call'),
+      h('span', {}, [`${dayLabel(m.startedAt)} ${timeOf(m.startedAt)}`, m.owner, `deleted ${ago(m.deletedAt)}${m.deletedBy ? ` by ${m.deletedBy.split(' ')[0]}` : ''}`].filter(Boolean).join(' · '))),
+    h('span', { class: 'trash-days' }, `${days(m.purgeAt)} day${days(m.purgeAt) === 1 ? '' : 's'} left`),
+    h('button', { class: 'btn', onclick: async () => { const r = await call('trash:restore', [m.id]); if (!r.ok) return alert(r.error); flash('Restored'); renderTrash(); renderList(); renderFolders(); } }, 'Restore'),
+    h('button', { class: 'link-btn danger', onclick: async () => {
+      if (!confirm(`Delete “${m.title || 'this call'}” for good? Its notes and transcript can’t be brought back.`)) return;
+      const r = await call('trash:purge', [m.id]); if (!r.ok) return alert(r.error); renderTrash();
+    } }, 'Delete forever')));
+  $view.replaceChildren(
+    h('div', { class: 'row', style: 'align-items:flex-end;gap:12px' },
+      h('h1', { class: 'page', style: 'flex:1;margin-bottom:0' }, 'Deleted'),
+      list.length ? h('button', { class: 'btn danger-btn', onclick: async () => {
+        if (!confirm(`Delete all ${list.length} call${list.length === 1 ? '' : 's'} in here for good? This can’t be undone.`)) return;
+        const r = await call('trash:purge', null); if (!r.ok) return alert(r.error); flash('Deleted emptied'); renderTrash();
+      } }, 'Empty Deleted') : null),
+    h('p', { class: 'hint', style: 'margin:8px 0 18px;color:var(--text-3)' }, `Deleted calls stay here for 30 days, then they’re removed for good. Nobody else sees them${admin ? ' (as the admin you see everyone’s)' : ''}.`),
+    list.length ? h('div', { class: 'trash-list' }, rows) : h('div', { class: 'live-empty' }, h('span', { class: 'le-ring', html: ICON.trash }), h('b', {}, 'Nothing deleted'), h('span', {}, 'Deleted calls wait here for 30 days.')));
+}
 
 async function renderFolder(id) {
   if (!foldersCache.some((x) => x.id === id)) foldersCache = await call('folders:list');
@@ -754,14 +859,40 @@ async function copyShareLink(id) {
   return share;
 }
 
-// A small "Link copied" note at the bottom of the window.
-function flash(text) {
+// A small note at the bottom of the window ("Link copied"), with Undo when given.
+function flash(text, undo) {
   document.querySelectorAll('.flash').forEach((x) => x.remove());
-  const el = h('div', { class: 'flash' }, text);
+  const el = h('div', { class: 'flash' }, h('span', {}, text),
+    undo ? h('button', { class: 'flash-undo', onclick: async () => { el.remove(); await undo(); } }, 'Undo') : null);
   document.body.append(el);
-  setTimeout(() => el.classList.add('out'), 1800);
-  setTimeout(() => el.remove(), 2200);
+  const ms = undo ? 6000 : 1800;
+  setTimeout(() => el.classList.add('out'), ms);
+  setTimeout(() => el.remove(), ms + 400);
 }
+
+// ---- Archive and Deleted ----------------------------------------------------------
+
+function afterCallsMoved(ids) {
+  clearSelection();
+  renderList(); renderFolders();
+  if ((route.view === 'call' || route.view === 'monitor') && ids.includes(route.id)) go({ view: 'home' }); else renderView();
+}
+async function trashCalls(ids) {
+  ids = [].concat(ids);
+  const r = await call('calls:delete', ids);
+  if (r && r.ok === false) { alert(r.error); return; }
+  afterCallsMoved(ids);
+  flash(ids.length === 1 ? 'Moved to Deleted' : `${ids.length} calls moved to Deleted`, async () => { await call('trash:restore', ids); renderList(); renderFolders(); renderView(); });
+}
+async function archiveCalls(ids, on = true) {
+  ids = [].concat(ids);
+  const r = await call('calls:archive', { ids, on });
+  if (!r.ok) { alert(r.error); return; }
+  afterCallsMoved(on ? ids : []);
+  flash(on ? (ids.length === 1 ? 'Archived' : `${ids.length} calls archived`) : 'Back in your notes', async () => { await call('calls:archive', { ids, on: !on }); renderList(); renderFolders(); renderView(); });
+}
+// The calls an action applies to: the whole selection if this call is part of it.
+const actionIds = (id) => (selectedCalls.has(id) && selectedCalls.size > 1 ? [...selectedCalls] : [id]);
 
 // Right-click menu, drawn by Cue so it looks the same on Mac, Windows and web.
 function contextMenu(e, items) {
@@ -780,10 +911,26 @@ function contextMenu(e, items) {
 function callContextMenu(e, c) {
   if (!authState.user) return;
   const done = c.status !== 'live' && c.status !== 'writing';
+  const ids = actionIds(c.id);
+  const many = ids.length > 1 ? ` ${ids.length} calls` : '';
   contextMenu(e, [
-    ['Open', () => go(c.status === 'live' && c.mine === false ? { view: 'monitor', id: c.id } : { view: 'call', id: c.id })],
-    done ? ['Copy share link', async () => { if (await copyShareLink(c.id)) flash('Share link copied'); }] : null,
+    many ? null : ['Open', () => go(c.status === 'live' && c.mine === false ? { view: 'monitor', id: c.id } : { view: 'call', id: c.id })],
+    done && !many ? ['Copy share link', async () => { if (await copyShareLink(c.id)) flash('Share link copied'); }] : null,
+    done ? (c.archivedAt ? [`Unarchive${many}`, () => archiveCalls(ids, false)] : [`Archive${many}`, () => archiveCalls(ids, true)]) : null,
+    done ? [`Delete${many}`, () => trashCalls(ids), true] : null,
   ]);
+}
+
+// Shown on a call row while the mouse is over it.
+function rowActions(c) {
+  if (!authState.user || c.status === 'live' || c.status === 'writing') return null;
+  const btn = (title, icon, fn) => h('button', { class: 'ra-btn', title, 'aria-label': title, html: ICON[icon],
+    onmousedown: (e) => e.stopPropagation(),
+    onclick: (e) => { e.stopPropagation(); e.preventDefault(); fn(e); } });
+  return h('span', { class: 'row-actions' },
+    btn('Copy share link', 'link', async (e) => { const b = e.currentTarget; b.classList.add('busy'); const ok = await copyShareLink(c.id); b.classList.remove('busy'); if (ok) flash('Share link copied'); }),
+    c.archivedAt ? btn('Unarchive', 'unarchive', () => archiveCalls(actionIds(c.id), false)) : btn('Archive', 'archive', () => archiveCalls(actionIds(c.id), true)),
+    btn('Delete', 'trash', () => trashCalls(actionIds(c.id))));
 }
 
 function shareButton(c) {
