@@ -486,7 +486,7 @@ async function renderPresets() {
   if (!locked) return;
   $view.querySelectorAll('.ai-tab').forEach((el) => el.remove());
   $view.querySelectorAll('.preset-tab').forEach((el) => { if (/New preset/.test(el.textContent)) el.remove(); });
-  $view.querySelectorAll('input, select, textarea, button:not(.preset-tab), [contenteditable="true"]').forEach((el) => { if (el.isContentEditable) el.contentEditable = 'false'; else el.disabled = true; });
+  $view.querySelectorAll('input, select, textarea, button:not(.preset-tab):not(.allow), [contenteditable="true"]').forEach((el) => { if (el.isContentEditable) el.contentEditable = 'false'; else el.disabled = true; });
   $view.querySelector('h1.page')?.after(h('div', { class: 'banner' }, 'Only Dylan can change presets. You can read them here.'));
 }
 
@@ -586,6 +586,44 @@ async function renderPresetsInner() {
 
   const move = (arr, i, d) => { const j = i + d; if (j < 0 || j >= arr.length) return; [arr[i], arr[j]] = [arr[j], arr[i]]; touch(); renderPresets(); };
 
+  // See it on a call: a step-by-step preview of the card, or a full AI test call.
+  const isAdmin = !authState.user || authState.user.role === 'admin';
+  const tryOut = h('div', { class: 'test-out' });
+  const tryPanel = h('div', { class: 'panel try-panel' },
+    h('div', { class: 'try-head' },
+      h('span', { class: 'grow' }, h('b', {}, 'See it on a call'), h('span', {}, p.kind === 'notes'
+        ? 'Walk through a call with this template: the call card, “Meeting over?” and the notes.'
+        : `Walk through every stage of a call on the real call card, with this preset’s ${p.checklist.length} beat${p.checklist.length === 1 ? '' : 's'} and ${(p.objections || []).length} objection${(p.objections || []).length === 1 ? '' : 's'}. Nothing is recorded.`)),
+      h('div', { class: 'try-btns' },
+      WEB ? h('span', { class: 'hint' }, 'Previews run in the desktop app.') : h('button', { class: 'btn primary allow', onclick: async () => {
+        const r = await call('preview:start', JSON.parse(JSON.stringify(p)));
+        if (!r.ok) tryOut.textContent = r.error;
+      } }, '▶ Preview on a call'),
+      !WEB && isAdmin && p.kind !== 'notes' ? h('button', { class: 'btn', onclick: async (e) => {
+        e.target.disabled = true; e.target.textContent = 'Writing a test call… (about 30 s)'; tryOut.textContent = '';
+        const r = await call('preview:testCall', JSON.parse(JSON.stringify(p)));
+        e.target.disabled = false; e.target.textContent = 'Test call with AI';
+        tryOut.textContent = r.ok ? (r.waiting ? 'Click Start on the “Call detected” card. Claude wrote a call that covers every beat and raises the objections; it plays at 2× with the real AI cues, then writes notes (private, in My notes).' : 'Running.') : r.error;
+      } }, 'Test call with AI') : null)),
+    tryOut);
+
+  // Advanced: when to use it, and coaching targets that differ from the team's.
+  const teamCoach = await call('coaching:get').catch(() => null);
+  const STAGES = [['opening', 'Opening'], ['discovery', 'Discovery'], ['pitch', 'Pitch'], ['objection', 'Objection'], ['close', 'Close'], ['wrap_up', 'Wrap-up']];
+  const pc = () => { p.coaching = p.coaching || {}; p.coaching.talk_targets = p.coaching.talk_targets || {}; return p.coaching; };
+  const numIn = (value, placeholder, onset) => h('input', { type: 'number', class: 'num-in', min: '0', max: '100', value: value ?? '', placeholder: String(placeholder ?? ''), oninput: (e) => { onset(e.target.value === '' ? undefined : Number(e.target.value)); touch(); } });
+  const advanced = h('details', { class: 'advanced', open: !!((p.match || []).length || Object.keys(p.coaching?.talk_targets || {}).length || p.coaching?.monologue_seconds) },
+    h('summary', {}, 'Advanced'),
+    h('div', { class: 'panel' },
+      field('Use automatically for meetings titled', h('input', { type: 'text', value: csv(p.match), placeholder: 'e.g. intro, discovery, demo', oninput: (e) => { p.match = fromCsv(e.target.value); touch(); } }),
+        'Comma separated. When a calendar meeting’s title has one of these words, Cue picks this preset for it.'),
+      p.kind === 'notes' ? null : h('div', { class: 'field' }, h('span', { class: 'lbl' }, 'Your talk share for this preset (%)'),
+        h('div', { class: 'stage-grid' }, STAGES.map(([k, label]) => h('label', { class: 'stage-cell' }, h('span', {}, label),
+          numIn(p.coaching?.talk_targets?.[k], teamCoach?.talk_targets?.[k], (v) => { const c = pc(); if (v == null) delete c.talk_targets[k]; else c.talk_targets[k] = v; })))),
+        h('div', { class: 'hint' }, 'Leave a box empty to use the team target (shown faded). The card marks the target on the talk bar for each stage.')),
+      p.kind === 'notes' ? null : field('Longest monologue before a nudge (seconds)', numIn(p.coaching?.monologue_seconds, teamCoach?.monologue_seconds, (v) => { const c = pc(); if (v == null) delete c.monologue_seconds; else c.monologue_seconds = v; }),
+        'Empty uses the team setting.')));
+
   const itemBlocks = p.checklist.map((it, i) => h('div', { class: 'editor-block' },
     h('div', { class: 'bar' }, h('span', { class: 'n' }, `Beat ${i + 1}`),
       h('button', { class: 'link-btn', title: 'Move up', onclick: () => move(p.checklist, i, -1) }, '↑'),
@@ -627,6 +665,7 @@ async function renderPresetsInner() {
             if (!confirm(`Delete the preset "${p.name}"?`)) return;
             presets.splice(presets.indexOf(p), 1); await call('presets:save', presets); presetEditing = null; renderPresets();
           } }, 'Delete') : null)),
+      tryPanel,
       improveRow, improveErr,
       p.kind === 'notes' ? h('div', {},
         h('div', { class: 'section-head' }, h('h2', {}, 'Note sections')),
@@ -637,6 +676,7 @@ async function renderPresetsInner() {
       p.kind === 'notes' ? null : h('div', { class: 'section-head' }, h('h2', {}, 'Objections')),
       p.kind === 'notes' ? null : objBlocks,
       p.kind === 'notes' ? null : h('button', { class: 'btn', style: 'margin:2px 0 24px', onclick: () => { p.objections = p.objections || []; p.objections.push({ id: uniqueId('objection', p.objections), title: '', trigger: '', phrases: [], caveat: '', response: [], links: [] }); touch(); renderPresets(); } }, '+ Add an objection'),
+      advanced,
       h('div', { class: 'row' }, h('button', { class: 'link-btn danger', onclick: async () => {
         if (!confirm('Replace all presets with the starter set? Your edits will be lost.')) return;
         await call('presets:reset'); presetEditing = null; renderPresets();
@@ -758,7 +798,26 @@ window.cue.on('live:notes', (n) => { const el = document.getElementById('live-ai
 window.cue.on('calendar:changed', () => { if (route.view === 'settings' || route.view === 'admin') renderView(); });
 let lastUpdateStatus = null;
 window.cue.on('update:changed', (st) => { if (route.view === 'settings' && st.status !== lastUpdateStatus) renderSettings(); lastUpdateStatus = st.status; });
+// The preset preview's control bar: step through the stages of a call.
+let previewBar = null;
+function drawPreviewBar(info) {
+  if (!info) { previewBar?.remove(); previewBar = null; return; }
+  const bar = h('div', { class: 'preview-bar' },
+    h('div', { class: 'pv-top' },
+      h('span', { class: 'pv-dot' }),
+      h('span', { class: 'grow' }, h('b', {}, `Preview · ${info.presetName}`), h('span', {}, `${info.step + 1}/${info.steps.length} · ${info.steps[info.step]}`)),
+      h('button', { class: 'icon-btn', title: 'Back', onclick: () => call('preview:go', -1) }, '◀'),
+      h('button', { class: 'icon-btn', title: info.paused ? 'Play' : 'Pause', onclick: () => call('preview:pause') }, info.paused ? '▶' : '❚❚'),
+      h('button', { class: 'icon-btn', title: 'Next', onclick: () => call('preview:go', 1) }, '▶▶'),
+      h('button', { class: 'icon-btn', title: 'End preview', onclick: () => call('preview:stop') }, '✕')),
+    h('div', { class: 'pv-steps' }, info.steps.map((label, i) => h('button', { class: `pv-step ${i === info.step ? 'on' : i < info.step ? 'past' : ''}`, title: label, onclick: () => call('preview:to', i) }))));
+  if (previewBar) previewBar.replaceWith(bar); else document.body.append(bar);
+  previewBar = bar;
+}
+window.cue.on('preview:changed', drawPreviewBar);
+
 window.cue.on('live:state', (st) => {
+  if (st?.preview) return; // the preset preview only drives the call card
   const wasLive = liveState?.mode === 'live';
   liveState = st;
   renderStart();
