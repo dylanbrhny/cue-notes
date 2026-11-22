@@ -10,7 +10,7 @@
 }
 
 const call = (ch, arg) => window.cue.invoke(ch, arg);
-// The browser version (cue.synapsemfg.com/app): everything except recording calls.
+// The browser version (cue.synapsemfg.com): everything except recording calls.
 const WEB = !!window.cue.web;
 const $view = document.getElementById('view');
 const $list = document.getElementById('call-list');

@@ -173,6 +173,8 @@ if(__exports != exports)module.exports = exports;return module.exports}));
   function dur(ms) { var m = Math.max(1, Math.round((ms || 0) / 60000)); return m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min' : m + ' min'; }
 
   var id = token();
+  // Any other address on cue.synapsemfg.com (a typo, an old path) goes to the app.
+  if (!id && location.hostname === 'cue.synapsemfg.com' && !/^\/notes\b/.test(location.pathname)) { location.replace('/'); return; }
   if (!/^[0-9a-f]{64}$/.test(id)) { state('Link not found', 'This notes link is incomplete. Ask whoever sent it for a fresh one.'); return; }
 
   fetch(SUPABASE.url + '/rest/v1/rpc/shared_meeting', {
