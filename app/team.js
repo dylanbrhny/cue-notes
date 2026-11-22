@@ -1,0 +1,742 @@
+// Team features for the main window: sign-in, who's live, watching a
+// teammate's call with nudges, and the shared settings panels.
+// Loaded after app.js and uses its helpers (h, call, go, …).
+
+// ---------------------------------------------------------------------------
+// Sign-in
+// ---------------------------------------------------------------------------
+
+function renderSignIn(message) {
+  const email = h('input', { type: 'text', placeholder: 'you@synapsemfg.com', autocomplete: 'username', spellcheck: 'false' });
+  const pin = h('input', { type: 'password', inputmode: 'numeric', placeholder: '••••', autocomplete: 'off', maxlength: '8', class: 'pin-input' });
+  const err = h('div', { class: 'form-error' }, message || '');
+  const btn = h('button', { class: 'btn primary', type: 'submit' }, 'Sign in');
+  const form = h('form', { class: 'signin', onsubmit: async (e) => {
+    e.preventDefault();
+    err.textContent = '';
+    if (!/^\S+@\S+\.\S+$/.test(email.value.trim())) { err.textContent = 'Enter your work email.'; return; }
+    if (!/^\d{4,8}$/.test(pin.value.trim())) { err.textContent = 'Enter the team PIN (numbers only).'; return; }
+    btn.disabled = true; btn.textContent = 'Signing in…';
+    const r = await call('auth:signIn', { email: email.value, pin: pin.value });
+    btn.disabled = false; btn.textContent = 'Sign in';
+    if (!r.ok) { err.textContent = r.error; pin.value = ''; pin.focus(); return; }
+    authState = await call('auth:state');
+    renderAccount(); renderTeamLive(); presetsChanged();
+    go({ view: 'home' });
+  } },
+  h('img', { class: 'signin-logo', src: 'assets/logo.svg', alt: '' }),
+  h('h1', {}, 'Sign in to your team'),
+  h('p', { class: 'signin-by' }, 'Cue is Synapse Mfg’s in-house call coach and note taker.'),
+  h('p', {}, 'Your calls, notes and presets are shared with the Synapse team. Use your work email and the team PIN.'),
+  h('div', { class: 'field' }, h('label', {}, 'Work email'), email),
+  h('div', { class: 'field' }, h('label', {}, 'Team PIN'), pin),
+  err,
+  h('div', { class: 'row' }, btn,
+    WEB ? null : h('button', { class: 'link-btn', type: 'button', onclick: () => { sessionStorage.setItem('cue-offline', '1'); go({ view: 'home' }); } }, 'Use without signing in')));
+  $view.replaceChildren(form);
+  setTimeout(() => email.focus(), 50);
+}
+
+function renderAccount() {
+  const el = document.getElementById('account');
+  if (!el) return;
+  if (!authState.configured) { el.replaceChildren(); return; }
+  if (!authState.user) {
+    el.replaceChildren(h('button', { class: 'account-btn', onclick: () => { sessionStorage.removeItem('cue-offline'); renderSignIn(); } }, 'Sign in to your team'));
+    return;
+  }
+  const u = authState.user;
+  el.replaceChildren(h('button', { class: 'account-btn', title: `${u.email} · settings`, onclick: () => go({ view: 'settings' }) },
+    h('span', { class: 'avatar' }, (u.name || u.email)[0].toUpperCase()), h('span', { class: 'grow' }, u.name || u.email)));
+}
+
+// ---------------------------------------------------------------------------
+// Who's live right now (sidebar)
+// ---------------------------------------------------------------------------
+
+let teamLive = [];
+async function renderTeamLive() {
+  const el = document.getElementById('team-live');
+  if (!el) return;
+  teamLive = authState.user ? await call('team:live') : [];
+  if (!teamLive.length) { el.replaceChildren(); return; }
+  el.replaceChildren(
+    h('div', { class: 'side-label' }, 'Live now'),
+    ...teamLive.map((c) => h('button', { class: `call-row live-row ${route.view === 'monitor' && route.id === c.id ? 'on' : ''}`, onclick: () => go({ view: 'monitor', id: c.id }) },
+      h('div', { class: 't' }, h('span', { class: 'live-dot pulse' }), `${c.owner || 'Teammate'}: ${c.title}`),
+      h('div', { class: 'm' }, `${c.presetName || 'Call'} · started ${timeOf(c.startedAt)} · watch`))));
+}
+
+// ---------------------------------------------------------------------------
+// Watching a teammate's call
+// ---------------------------------------------------------------------------
+
+let mon = null; // {id, meeting, snapshot, names}
+
+function stopMonitor() {
+  if (mon) call('monitor:close');
+  mon = null;
+}
+
+function dreamCard(score) {
+  const tone = score >= 70 ? 'good' : score >= 45 ? 'mid' : 'low';
+  return h('div', { class: `dream ${tone}`, title: 'Share of pitch lines that sold the buyer\'s outcome instead of listing features' },
+    h('span', { class: 'num' }, `${score}%`), h('span', { class: 'txt' }, 'selling the outcome'));
+}
+
+async function renderMonitor(id) {
+  stopMonitor();
+  $view.replaceChildren(h('div', { class: 'placeholder' }, h('span', { class: 'spin' }), 'Connecting to the call…'));
+  const r = await call('monitor:open', id).catch(() => null);
+  if (!r || !r.meeting) { $view.replaceChildren(h('div', { class: 'placeholder' }, 'That call isn’t available.')); return; }
+  const first = (r.meeting.owner || 'Caller').split(' ')[0];
+  mon = { id, meeting: r.meeting, snapshot: r.snapshot, names: { me: first, them: 'Them' } };
+
+  const input = h('input', { type: 'text', class: 'input nudge-input', maxlength: '200', placeholder: `Send ${first} a quiet nudge…` });
+  const status = h('span', { class: 'saved' });
+  const sendNudge = async (text) => {
+    text = String(text || '').trim();
+    if (!text) return;
+    status.textContent = 'Sending…';
+    const res = await call('nudge:send', { id, text });
+    status.textContent = res.ok ? `Sent to ${first}` : res.error;
+    if (res.ok) input.value = '';
+    setTimeout(() => { status.textContent = ''; }, 2500);
+  };
+  const quick = ['Tie it to their goal', 'Ask their close rate', 'Do the meeting math', 'Compare to an in-house hire', 'Ask for the decision', 'Slow down, let them talk'];
+
+  $view.replaceChildren(
+    h('div', { class: 'meta' }, h('span', { class: 'chip live' }, h('span', { class: 'live-dot pulse' }), 'Live'),
+      h('span', { id: 'mon-clock' }, fmtClock(Date.now() - r.meeting.startedAt)), h('span', {}, r.meeting.owner || ''),
+      r.meeting.presetName ? h('span', { class: 'chip' }, r.meeting.presetName) : null),
+    h('h1', { class: 'page', style: 'margin-bottom:16px' }, r.meeting.title),
+    h('div', { id: 'mon-stats', class: 'score-row' }),
+    h('div', { id: 'mon-alert' }),
+    h('div', { class: 'nudge-box' },
+      h('form', { class: 'row', onsubmit: (e) => { e.preventDefault(); sendNudge(input.value); } }, input, h('button', { class: 'btn primary', type: 'submit' }, 'Send'), status),
+      h('div', { class: 'quick' }, quick.map((q) => h('button', { class: 'chip-btn', type: 'button', onclick: () => sendNudge(q) }, q)))),
+    h('div', { class: 'section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Checklist')), h('ul', { class: 'checks', id: 'mon-checks' })),
+    h('div', { class: 'section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Live transcript')), h('div', { class: 'lines', id: 'mon-lines' },
+      (r.meeting.transcript || []).map((s) => lineRow(s, null, false, mon.names))), h('div', { class: 'lines', id: 'mon-partial' })),
+  );
+  paintMonitor();
+}
+
+function paintMonitor() {
+  if (!mon) return;
+  const s = mon.snapshot;
+  const stats = document.getElementById('mon-stats');
+  const checks = document.getElementById('mon-checks');
+  const alert = document.getElementById('mon-alert');
+  if (!stats) return;
+  if (!s) { stats.replaceChildren(h('div', { class: 'placeholder' }, 'Waiting for the first update…')); return; }
+  stats.replaceChildren(coverage(s.done, s.total), s.dreamScore != null ? dreamCard(s.dreamScore) : h('div', { class: 'dream pending' }, h('span', { class: 'txt' }, 'Outcome score shows after a few pitch lines')));
+  checks.replaceChildren(...(s.items || []).map((i) => checkRow(i, false)));
+  const bits = [];
+  if (s.objection) bits.push(h('div', { class: 'obj' }, h('b', {}, `Objection: ${s.objection.title}`), s.objection.quote ? h('span', {}, `“${s.objection.quote}”`) : null));
+  if (s.pitchNudge) bits.push(h('div', { class: 'banner warn' }, `Cue told ${mon.names.me}: ${s.pitchNudge.text}`));
+  if (s.teamNudge) bits.push(h('div', { class: 'banner' }, `On ${mon.names.me}’s card now: “${s.teamNudge.text}”`));
+  alert.replaceChildren(...bits);
+  const partial = document.getElementById('mon-partial');
+  partial.replaceChildren(...['them', 'me'].filter((k) => s.partials && s.partials[k]).map((k) => lineRow({ speaker: k, text: s.partials[k] }, null, true, mon.names)));
+}
+
+function onMonitorEvent(e) {
+  if (!mon || e.id !== mon.id) return;
+  const main = document.getElementById('main');
+  const atBottom = main.scrollHeight - main.scrollTop - main.clientHeight < 120;
+  if (e.type === 'segment') {
+    document.getElementById('mon-lines')?.append(lineRow(e.seg, null, false, mon.names));
+  } else if (e.type === 'snapshot') {
+    mon.snapshot = e.snapshot;
+    paintMonitor();
+  } else if (e.type === 'status' && e.status !== 'live') {
+    const id = mon.id;
+    setTimeout(() => { if (route.view === 'monitor' && route.id === id) go({ view: 'call', id }); }, 1500);
+    return;
+  }
+  if (atBottom) main.scrollTop = main.scrollHeight;
+}
+
+setInterval(() => {
+  const el = document.getElementById('mon-clock');
+  if (el && mon) el.textContent = fmtClock(Date.now() - mon.meeting.startedAt);
+}, 1000);
+
+// ---------------------------------------------------------------------------
+// Settings panels for team features (inserted at the top of Settings)
+// ---------------------------------------------------------------------------
+
+async function teamSettingsPanels(s) {
+  const panels = [];
+  // Account
+  if (authState.configured) {
+    panels.push(h('div', { class: 'panel' }, h('h3', {}, 'Team account'),
+      authState.user
+        ? h('div', { class: 'row', style: 'margin-bottom:12px' }, h('span', { class: 'grow' }, `Signed in as ${authState.user.name} (${authState.user.email})`),
+          h('button', { class: 'btn', onclick: async () => { await call('auth:signOut'); authState = await call('auth:state'); renderAccount(); renderTeamLive(); go({ view: 'home' }); } }, 'Sign out'))
+        : h('div', { class: 'row', style: 'margin-bottom:12px' }, h('span', { class: 'grow' }, 'Not signed in. Calls stay on this computer.'),
+          h('button', { class: 'btn primary', onclick: () => { sessionStorage.removeItem('cue-offline'); renderSignIn(); } }, 'Sign in')),
+      authState.user ? h('label', { class: 'toggle' },
+        h('input', { type: 'checkbox', checked: !!s.notifyTeamCalls, onchange: (e) => call('settings:save', { notifyTeamCalls: e.target.checked }) }),
+        h('span', { class: 'tx' }, h('b', {}, 'Tell me when a teammate starts a call'), h('span', {}, 'A notification with a link to watch it live.'))) : null));
+  }
+
+  if (authState.user?.role === 'admin') panels.push(await adminPanel(), await coachingPanel(), await shareDomainPanel());
+
+  // Who we are + how we sell
+  const ws = await call('workspace:get');
+  const profile = h('textarea', { rows: 5, value: ws.companyProfile, placeholder: 'Who we are, what we sell, who buys it, our pricing. Claude reads this on every call.' });
+  const knowledge = h('textarea', { rows: 8, value: ws.knowledge, placeholder: 'Leave empty to use the built-in Synapse closing playbook (sell the dream outcome, meeting math, in-house hire comparison).' });
+  const saved = h('span', { class: 'saved' });
+  const save = debounce(async () => { await call('workspace:save', { companyProfile: profile.value, knowledge: knowledge.value }); saved.textContent = ws.shared ? 'Saved for the team' : 'Saved'; setTimeout(() => { saved.textContent = ''; }, 1600); }, 600);
+  profile.addEventListener('input', save);
+  knowledge.addEventListener('input', save);
+  panels.push(h('div', { class: 'panel' }, h('div', { class: 'row', style: 'margin-bottom:12px' }, h('h3', { style: 'margin:0;flex:1' }, 'Who we are and how we sell'), saved),
+    field('Company profile', profile, ws.shared ? 'Shared with the team.' : 'Saved on this computer until you sign in.'),
+    field('Sales playbook', knowledge, ws.knowledge ? 'Your own playbook replaces the built-in one.' : `Using the built-in closing playbook (${Math.round((ws.bundledKnowledge || '').split(/\s+/).length / 10) * 10} words): sell the dream outcome, not features.`),
+    !ws.knowledge && ws.bundledKnowledge ? h('div', { class: 'row', style: 'margin:-4px 0 12px' }, h('button', { class: 'link-btn', onclick: () => { knowledge.value = ws.bundledKnowledge; save(); } }, 'Copy the built-in playbook here to edit it')) : null));
+
+  // Calendar
+  const cal = await call('calendar:status');
+  const calInput = h('input', { type: 'password', value: s.calendarUrl ? s.calendarUrl : '', placeholder: 'https://calendar.google.com/calendar/ical/…/private-…/basic.ics', autocomplete: 'off', spellcheck: 'false',
+    onfocus: (e) => { if (e.target.value.startsWith('••••')) e.target.value = ''; },
+    onchange: async (e) => {
+      const v = e.target.value.trim();
+      if (v.startsWith('••••')) return;
+      const r = await call('settings:save', { calendarUrl: v });
+      if (r.calendarError) { alert(r.calendarError); e.target.value = ''; }
+    } });
+  const manual = h('details', { class: 'cal-manual' }, h('summary', {}, 'Paste the link yourself'),
+    field('Private calendar link', calInput, 'Google Calendar → Settings → your calendar → "Secret address in iCal format".'));
+  panels.push(h('div', { class: 'panel' }, h('h3', {}, 'Calendar'),
+    cal.source === 'team'
+      ? h('div', { class: 'cal-state' },
+          h('div', { class: 'row' }, h('span', { class: 'dot ok' }), h('b', { class: 'grow' }, `Connected by your admin · ${cal.events} meetings this week`)),
+          h('div', { class: 'hint' }, `Synapse’s team calendars are connected${cal.teamBy ? ` through ${cal.teamBy}` : ''}. Nothing to set up on your side.`),
+          (cal.upcoming || []).length ? h('ul', { class: 'upcoming' }, cal.upcoming.slice(0, 4).map((e) => h('li', {}, `${dayLabel(e.start)} ${timeOf(e.start)} · ${e.title}`))) : null)
+    : cal.configured
+      ? h('div', { class: 'cal-state' },
+          h('div', { class: 'row' }, h('span', { class: `dot ${cal.lastError ? 'bad' : 'ok'}` }),
+            h('b', { class: 'grow' }, cal.lastError ? `Couldn’t read the calendar: ${cal.lastError}` : `Connected · ${cal.events} meetings this week`),
+            h('button', { class: 'link-btn danger', onclick: async () => { if (confirm('Disconnect your calendar?')) { await call('calendar:disconnect'); renderSettings(); } } }, 'Disconnect')),
+          h('div', { class: 'hint' }, cal.synced ? 'Saved to your Cue account, so it stays connected after updates and on any computer you sign in on.' : 'Saved on this computer. Sign in to keep it on your account.'),
+          (cal.upcoming || []).length ? h('ul', { class: 'upcoming' }, cal.upcoming.slice(0, 4).map((e) => h('li', {}, `${dayLabel(e.start)} ${timeOf(e.start)} · ${e.title}`))) : null)
+      : cal.waiting
+        ? h('div', { class: 'cal-state' },
+            h('div', { class: 'row' }, h('span', { class: 'spin' }), h('b', { class: 'grow' }, 'Waiting for the secret address…'),
+              h('button', { class: 'link-btn', onclick: async () => { await call('calendar:cancel'); renderSettings(); } }, 'Cancel')),
+            h('ol', { class: 'cal-steps' },
+              h('li', {}, 'In the Google Calendar tab that just opened, scroll to ', h('b', {}, 'Integrate calendar'), '.'),
+              h('li', {}, 'Next to ', h('b', {}, 'Secret address in iCal format'), ', click the copy button.'),
+              h('li', {}, 'That’s it. Cue picks it up on its own and clears your clipboard.')))
+        : h('div', { class: 'cal-state' },
+            h('div', { class: 'hint' }, 'Calls get their real meeting title and attendees, and Cue lists what’s next. Connect once: it stays on your account.'),
+            h('div', { class: 'row', style: 'margin-top:10px' }, h('button', { class: 'btn primary', onclick: async () => { await call('calendar:connect'); renderSettings(); } }, 'Connect Google Calendar'))),
+    cal.configured || WEB ? null : manual));
+  if (WEB && !cal.configured) panels[panels.length - 1].append(h('div', { class: 'hint' }, 'Calendars are connected from the Cue desktop app.'));
+  if (authState.user?.role === 'admin') panels.push(await teamCalendarPanel());
+
+  if (WEB) return panels; // connecting Claude and updates happen in the desktop app
+  // Claude
+  panels.push(h('div', { class: 'panel' }, h('h3', {}, 'Claude'),
+    h('div', { class: 'hint', style: 'margin-bottom:10px;font-size:12.5px;color:var(--text-3);line-height:1.5' }, 'Let Claude search and read every team call, the same way it reads Granola today.'),
+    h('div', { class: 'row', style: 'margin-bottom:12px' }, h('button', { class: 'btn', disabled: !authState.user, onclick: async (e) => {
+      e.target.disabled = true; e.target.textContent = 'Connecting…';
+      const r = await call('claude:connect');
+      e.target.textContent = r.ok ? 'Connected' : 'Connect Claude';
+      e.target.disabled = false;
+      claudeOut.textContent = r.ok ? r.message : r.error;
+    } }, 'Connect Claude'), authState.user ? null : h('span', { class: 'saved' }, 'Sign in first')),
+    h('div', { class: 'test-out', style: 'margin-bottom:12px' })));
+  const claudeOut = panels[panels.length - 1].lastChild;
+
+  // Updates
+  const up = await call('update:state');
+  const upText = {
+    off: 'Updates are checked in installed copies only.',
+    idle: 'Checking for updates shortly…',
+    current: 'You have the latest version.',
+    available: `Version ${up.latest} is available.`,
+    downloading: `Downloading ${up.latest}… ${up.progress || 0}%`,
+    ready: `Version ${up.latest} is downloaded and ready.`,
+    downloaded: `Version ${up.latest} was saved to Downloads. Open it and drag Cue into Applications.`,
+    error: `Couldn't check for updates: ${up.error || ''}`,
+  }[up.status] || '';
+  const upBtns = [];
+  if (up.status === 'ready') upBtns.push(h('button', { class: 'btn primary', onclick: async () => { const r = await call('update:install'); if (!r.ok) alert(r.error); } }, 'Restart to update'));
+  if (up.status === 'available' && info.platform === 'darwin') upBtns.push(h('button', { class: 'btn primary', onclick: async (e) => { e.target.disabled = true; e.target.textContent = 'Downloading…'; const r = await call('update:mac'); e.target.disabled = false; e.target.textContent = r.ok ? 'Opened' : 'Download update'; if (!r.ok) alert(r.error); } }, 'Download update'));
+  if (up.status !== 'off' && up.status !== 'downloading' && up.status !== 'ready') upBtns.push(h('button', { class: 'btn', onclick: async () => { await call('update:check'); renderSettings(); } }, 'Check now'));
+  panels.push(h('div', { class: 'panel' }, h('h3', {}, 'Updates'),
+    h('div', { class: 'hint', style: 'margin-bottom:10px;font-size:12.5px;color:var(--text-2);line-height:1.5' }, `Cue ${up.current || info.version}. ${upText}`),
+    up.error && up.status !== 'error' ? h('div', { class: 'hint', style: 'margin-bottom:10px;font-size:12px;color:var(--amber)' }, up.error) : null,
+    upBtns.length ? h('div', { class: 'row', style: 'margin-bottom:12px' }, ...upBtns) : null));
+  return panels;
+}
+
+// ---------------------------------------------------------------------------
+// API keys: one set for the whole team, managed by the admin
+// ---------------------------------------------------------------------------
+
+async function keysPanel(s, keyInput, save, out) {
+  const k = await call('keys:state');
+  const testRow = h('div', { class: 'row', style: 'margin-bottom:12px' }, h('button', { class: 'btn', onclick: async (e) => {
+    e.target.disabled = true; out.textContent = 'Testing…';
+    const r = await call('settings:test');
+    e.target.disabled = false;
+    const line = (name, v) => h('div', {}, `${name}: `, h('span', { class: v === 'ok' ? 'ok' : 'bad' }, v === 'ok' ? 'working' : v));
+    out.replaceChildren(line('ElevenLabs', r.elevenlabs), line('Anthropic', r.anthropic));
+  } }, 'Test keys'), out);
+
+  if (!k.signedIn) {
+    return h('div', { class: 'panel' }, h('h3', {}, 'Keys (this computer)'),
+      field('ElevenLabs API key', keyInput('elevenlabsKey', 'xi-…'), 'Sign in to use the team’s keys instead.'),
+      field('Anthropic API key', keyInput('anthropicKey', 'sk-ant-…')),
+      testRow);
+  }
+  if (!k.isAdmin) {
+    return h('div', { class: 'panel' }, h('h3', {}, 'Keys'),
+      h('div', { class: 'hint', style: 'margin-bottom:10px;font-size:13px;color:var(--text-2);line-height:1.5' },
+        k.source === 'team' ? 'Cue uses the team’s ElevenLabs and Anthropic keys, managed by your admin. Nothing to set up here.' : 'Your admin hasn’t added the team keys yet.'),
+      testRow);
+  }
+  const status = h('span', { class: 'saved' });
+  const teamKey = (f, placeholder) => h('input', { type: 'password', value: k[f], placeholder, autocomplete: 'off', spellcheck: 'false',
+    onfocus: (e) => { if (e.target.value.startsWith('••••')) e.target.value = ''; },
+    onchange: async (e) => {
+      const v = e.target.value.trim();
+      if (!v) return;
+      status.textContent = 'Saving…';
+      const r = await call('keys:saveTeam', { [f]: v });
+      status.textContent = r.ok ? 'Saved for the whole team' : r.error;
+      setTimeout(() => { status.textContent = ''; }, 2500);
+    } });
+  return h('div', { class: 'panel' },
+    h('div', { class: 'row', style: 'margin-bottom:12px' }, h('h3', { style: 'margin:0;flex:1' }, 'Team keys'), status),
+    h('div', { class: 'hint', style: 'margin:-4px 0 12px;font-size:12.5px;color:var(--text-3);line-height:1.5' }, 'Everyone on the team uses these. Only admins can change them.'),
+    field('ElevenLabs API key', teamKey('elevenlabsKey', 'xi-…'), 'Live transcription for both sides of every call.'),
+    field('Anthropic API key', teamKey('anthropicKey', 'sk-ant-…'), 'Live cues, objection detection, notes and the preset generator.'),
+    field('Model', h('select', { onchange: async (e) => { const r = await call('keys:saveTeam', { model: e.target.value }); status.textContent = r.ok ? 'Saved for the whole team' : r.error; } },
+      Object.entries(info.models || {}).map(([id, m]) => h('option', { value: id, selected: id === k.model }, m.label))),
+      'Opus judges best. Haiku is faster and far cheaper; try it if cues feel slow.'),
+    testRow);
+}
+
+// Admin: who's on the team, and the PIN.
+// Admin: connect Google once and every teammate's calendar comes with it.
+async function teamCalendarPanel() {
+  const st = await call('teamcal:status');
+  const err = h('div', { class: 'form-error' });
+  const ago = (t) => { if (!t) return 'not yet'; const m = Math.round((Date.now() - Date.parse(t)) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`; };
+  const connect = h('button', { class: 'btn primary', disabled: !st.available, onclick: async (e) => {
+    e.target.disabled = true; e.target.textContent = 'Waiting for Google…'; err.textContent = '';
+    const r = await call('teamcal:connect');
+    if (!r.ok) { err.textContent = r.error; e.target.disabled = false; e.target.textContent = 'Connect team calendars'; return; }
+    renderSettings();
+  } }, st.connected ? 'Reconnect' : 'Connect team calendars');
+  return h('div', { class: 'panel' }, h('h3', {}, 'Team calendars'),
+    h('p', { class: 'hint' }, st.connected
+      ? `Connected through ${st.by}. Every teammate’s meetings sync every 5 minutes while your Cue is open. Each person only sees their own; you see everyone’s.`
+      : 'Sign in with Google once as the admin. Cue then reads the calendar of everyone on the team, so nobody else has to set anything up.'),
+    st.connected && st.error ? h('div', { class: 'banner warn', style: 'margin-bottom:10px' }, st.error) : null,
+    st.connected ? h('ul', { class: 'members' }, (st.members || []).map((m) => h('li', {},
+      h('span', { class: 'avatar' }, (m.name || m.email)[0].toUpperCase()),
+      h('span', { class: 'grow' }, h('b', {}, m.name), h('span', {}, ` ${m.email}`)),
+      m.error ? h('span', { class: 'chip bad', title: m.error }, 'Not shared') : m.count != null ? h('span', { class: 'chip' }, `${m.count} meetings`) : h('span', { class: 'chip' }, 'Waiting')))) : null,
+    h('div', { class: 'row' }, connect,
+      st.connected ? h('button', { class: 'btn', onclick: async (e) => { e.target.textContent = 'Syncing…'; await call('teamcal:sync'); renderSettings(); } }, 'Sync now') : null,
+      st.connected ? h('span', { class: 'saved' }, `Last sync ${ago(st.lastSyncAt)}`) : null,
+      st.connected ? h('button', { class: 'link-btn danger', onclick: async () => { if (confirm('Disconnect team calendars for everyone?')) { await call('teamcal:disconnect'); renderSettings(); } } }, 'Disconnect') : null),
+    st.available ? null : h('div', { class: 'hint' }, st.webOnly ? 'Connect or reconnect team calendars from the Cue desktop app.' : 'This build has no Google sign-in set up.'),
+    err);
+}
+
+// How the live coach judges talk time (team-wide; Claude can change it too).
+async function coachingPanel() {
+  const c = await call('coaching:get');
+  const msg = h('span', { class: 'saved' });
+  const save = debounce(async (patch) => { const r = await call('coaching:save', patch); msg.textContent = r.ok ? 'Saved' : r.error; setTimeout(() => { msg.textContent = ''; }, 1500); }, 500);
+  const num = (val, min, max, onSet) => h('input', { type: 'number', class: 'input coach-num', value: val, min, max, oninput: (e) => { const v = Math.max(min, Math.min(max, Number(e.target.value) || 0)); onSet(v); } });
+  const stages = [['opening', 'Opening'], ['discovery', 'Discovery'], ['pitch', 'Pitch'], ['objection', 'Objection'], ['close', 'Close'], ['wrap_up', 'Wrap-up']];
+  return h('div', { class: 'panel' }, h('div', { class: 'row' }, h('h3', { class: 'grow' }, 'Coaching'), msg),
+    h('p', { class: 'hint' }, 'The coach works out which stage the call is in and nudges toward your talk share for that stage, plus monologues, cutting in, questions and pace.'),
+    h('div', { class: 'coach-grid' }, stages.map(([id, label]) => h('label', { class: 'coach-cell' }, h('span', {}, label), h('span', { class: 'coach-pct' }, num(c.talk_targets[id], 10, 90, (v) => save({ talk_targets: { [id]: v } })), '%')))),
+    h('div', { class: 'coach-grid two' },
+      h('label', { class: 'coach-cell' }, h('span', {}, 'Longest monologue'), h('span', { class: 'coach-pct' }, num(c.monologue_seconds, 20, 300, (v) => save({ monologue_seconds: v })), 's')),
+      h('label', { class: 'coach-cell' }, h('span', {}, 'In discovery'), h('span', { class: 'coach-pct' }, num(c.discovery_monologue_seconds, 15, 300, (v) => save({ discovery_monologue_seconds: v })), 's')),
+      h('label', { class: 'coach-cell' }, h('span', {}, 'Fastest pace'), h('span', { class: 'coach-pct' }, num(c.pace_wpm, 120, 260, (v) => save({ pace_wpm: v })), 'wpm')),
+      h('label', { class: 'coach-cell' }, h('span', {}, 'Time between tips'), h('span', { class: 'coach-pct' }, num(c.nudge_cooldown_seconds, 30, 600, (v) => save({ nudge_cooldown_seconds: v })), 's'))));
+}
+
+async function shareDomainPanel() {
+  const base = await call('share:base');
+  const input = h('input', { type: 'text', class: 'input', value: base, spellcheck: 'false', style: 'flex:1' });
+  const msg = h('span', { class: 'saved' });
+  return h('div', { class: 'panel' }, h('h3', {}, 'Share links'),
+    h('p', { class: 'hint' }, 'Links look like this address + /notes/<long id>. Change it to https://ops.synapsemfg.com once the ops dashboard forwards /notes. Existing links switch over too.'),
+    h('div', { class: 'row' }, input, h('button', { class: 'btn', onclick: async () => {
+      const r = await call('share:setBase', input.value);
+      msg.textContent = r.ok ? 'Saved' : r.error; if (r.ok) input.value = r.base;
+    } }, 'Save'), msg));
+}
+
+async function adminPanel() {
+  const members = await call('team:list');
+  const err = h('div', { class: 'form-error' });
+  const name = h('input', { type: 'text', placeholder: 'Name', class: 'input' });
+  const email = h('input', { type: 'text', placeholder: 'name@synapsemfg.com', class: 'input', spellcheck: 'false' });
+  const role = h('select', { class: 'input' }, h('option', { value: 'member' }, 'Member'), h('option', { value: 'admin' }, 'Admin'));
+  const pin = h('input', { type: 'password', inputmode: 'numeric', placeholder: 'New PIN', class: 'input pin-input', maxlength: '8' });
+  const pinMsg = h('span', { class: 'saved' });
+  return h('div', { class: 'panel' }, h('h3', {}, 'Team'),
+    h('ul', { class: 'members' }, members.map((m) => h('li', {},
+      h('span', { class: 'avatar' }, (m.name || m.email)[0].toUpperCase()),
+      h('span', { class: 'grow' }, h('b', {}, m.name), h('span', {}, ` ${m.email}`)),
+      h('span', { class: 'chip' }, m.role === 'admin' ? 'Admin' : 'Member'),
+      h('span', { class: 'saved', style: 'min-width:70px;text-align:right' }, m.joinedAt ? 'signed in' : 'not yet'),
+      m.email === authState.user?.email ? null : h('button', { class: 'link-btn danger', onclick: async () => {
+        if (!confirm(`Remove ${m.name} from the team? Their calls stay; they lose access.`)) return;
+        const r = await call('team:removeMember', m.email); if (!r.ok) alert(r.error); renderSettings();
+      } }, 'Remove')))),
+    h('form', { class: 'row add-member', onsubmit: async (e) => {
+      e.preventDefault(); err.textContent = '';
+      if (!name.value.trim() || !/^\S+@\S+\.\S+$/.test(email.value.trim())) { err.textContent = 'Enter a name and an email.'; return; }
+      const r = await call('team:setMember', { email: email.value, name: name.value, role: role.value });
+      if (!r.ok) { err.textContent = r.error; return; }
+      renderSettings();
+    } }, name, email, role, h('button', { class: 'btn', type: 'submit' }, 'Add')),
+    err,
+    h('form', { class: 'row', style: 'margin:6px 0 12px', onsubmit: async (e) => {
+      e.preventDefault();
+      if (!/^\d{4,8}$/.test(pin.value)) { pinMsg.textContent = 'Use 4 to 8 digits.'; return; }
+      if (!confirm('Change the team PIN? Everyone signs in with the new one from now on; people already signed in stay signed in.')) return;
+      const r = await call('team:setPin', pin.value);
+      pinMsg.textContent = r.ok ? 'PIN changed. Tell the team.' : r.error; pin.value = '';
+    } }, h('span', { class: 'lbl', style: 'margin-right:4px' }, 'Team PIN'), pin, h('button', { class: 'btn', type: 'submit' }, 'Change PIN'), pinMsg));
+}
+
+// ---------------------------------------------------------------------------
+// Folders (sidebar tree + folder page), Granola style
+// ---------------------------------------------------------------------------
+
+let foldersCache = [];
+let spacesCache = [];
+let addingFolder = null;      // {parent: folderId|null, space: 'mine'|'team'|spaceId} while typing a new name
+let addingSpace = false;
+let renamingFolder = null;    // folder id being renamed inline
+let renamingSpace = null;
+let menuFor = null;           // 'f:<id>' or 's:<id>' whose ⋯ menu is open
+let pickerFor = null;         // 'f:<id>' or 's:<id>' whose icon picker is open
+let dragging = null;          // {kind: 'folder'|'call', id}
+const collapsed = new Set((() => { try { return JSON.parse(localStorage.getItem('cue-folders-collapsed') || '[]'); } catch { return []; } })());
+const saveCollapsed = () => { try { localStorage.setItem('cue-folders-collapsed', JSON.stringify([...collapsed])); } catch {} };
+
+const descendants = (id) => { const out = []; const walk = (x) => { for (const k of foldersCache.filter((f) => f.parentId === x)) { out.push(k.id); walk(k.id); } }; walk(id); return out; };
+const folderPath = (id) => { const parts = []; let f = foldersCache.find((x) => x.id === id); while (f) { parts.unshift(f.name); f = foldersCache.find((x) => x.id === f.parentId); } return parts.join(' › '); };
+// Which space a folder lives in: private folders are "My notes".
+const spaceOf = (f) => (f.private ? 'mine' : f.spaceId && spacesCache.some((s) => s.id === f.spaceId) ? f.spaceId : 'team');
+const topFolders = (space) => foldersCache.filter((f) => spaceOf(f) === space && (!f.parentId || !foldersCache.some((p) => p.id === f.parentId)));
+
+function folderIcon(f, size = 15) {
+  if (f.icon) return h('span', { class: 'f-emoji', style: `font-size:${size - 2}px;width:${size}px` }, f.icon);
+  return h('span', { class: 'folder-ico', html: ICON.folder });
+}
+
+const EMOJI = ['📁', '📂', '🗂️', '⭐', '🔥', '🎯', '💰', '📈', '📊', '🤝', '📞', '☎️', '💬', '🧠', '💡', '🛠️', '🏭', '⚙️', '🔩', '🚚', '🏗️', '🧪', '🔒', '👤', '👥', '🧑‍💼', '🎓', '📚', '📝', '✅', '🗓️', '⏳', '🚀', '🏆', '❤️', '🟢', '🟡', '🔴', '🔵', '🟣', '⚫', '🌱', '🧭', '🎙️', '📣', '💼', '🏢', '🇺🇸', '🧾', '🤖'];
+
+function iconPicker(onPick) {
+  const custom = h('input', { class: 'input', placeholder: 'Or paste any emoji', maxlength: '8', onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); pick(custom.value.trim()); } } });
+  const pick = async (icon) => { pickerFor = null; await onPick(icon); renderFolders(); };
+  return h('div', { class: 'pop picker', onclick: (e) => e.stopPropagation() },
+    h('div', { class: 'emoji-grid' }, EMOJI.map((e) => h('button', { class: 'emoji', type: 'button', onclick: () => pick(e) }, e))),
+    h('div', { class: 'row', style: 'margin-top:8px;flex-wrap:nowrap' }, custom, h('button', { class: 'btn', type: 'button', onclick: () => pick('') }, 'Remove')));
+}
+
+const menuItem = (label, fn, danger) => h('button', { class: danger ? 'danger' : '', type: 'button', onclick: (e) => { e.stopPropagation(); menuFor = null; fn(); } }, label);
+
+function folderMenu(f) {
+  return h('div', { class: 'pop menu-pop', onclick: (e) => e.stopPropagation() },
+    menuItem('Rename', () => { renamingFolder = f.id; renderFolders(); }),
+    menuItem('Change icon', () => { pickerFor = `f:${f.id}`; renderFolders(); }),
+    menuItem('New folder inside', () => { addingFolder = { parent: f.id, space: spaceOf(f) }; collapsed.delete(f.id); saveCollapsed(); renderFolders(); }),
+    f.parentId ? menuItem('Move out of its folder', async () => { const r = await call('folders:update', { id: f.id, patch: { parentId: null } }); if (!r.ok) alert(r.error); renderFolders(); }) : null,
+    spaceOf(f) !== 'mine' ? menuItem('Move to My notes (private)', async () => { const r = await call('folders:toSpace', { id: f.id, target: 'mine' }); if (!r.ok) alert(r.error); renderFolders(); }) : null,
+    spaceOf(f) !== 'team' ? menuItem('Move to Team', async () => { const r = await call('folders:toSpace', { id: f.id, target: 'team' }); if (!r.ok) alert(r.error); renderFolders(); }) : null,
+    ...spacesCache.filter((sp) => spaceOf(f) !== sp.id).map((sp) => menuItem(`Move to ${sp.name}`, async () => { const r = await call('folders:toSpace', { id: f.id, target: sp.id }); if (!r.ok) alert(r.error); renderFolders(); })),
+    menuItem('Delete', async () => {
+      if (!confirm(`Delete the folder "${f.name}"? Its calls stay in All calls, and folders inside it move up.`)) return;
+      await call('folders:delete', f.id); if (route.view === 'folder' && route.id === f.id) go({ view: 'home' }); else renderFolders();
+    }, true));
+}
+
+function spaceMenu(sp) {
+  const custom = sp.id !== 'mine' && sp.id !== 'team';
+  return h('div', { class: 'pop menu-pop', onclick: (e) => e.stopPropagation() },
+    menuItem('New folder', () => { addingFolder = { parent: null, space: sp.id }; collapsed.delete(`s:${sp.id}`); saveCollapsed(); renderFolders(); }),
+    custom ? menuItem('Rename', () => { renamingSpace = sp.id; renderFolders(); }) : null,
+    custom ? menuItem('Change icon', () => { pickerFor = `s:${sp.id}`; renderFolders(); }) : null,
+    custom ? menuItem('Delete space', async () => {
+      if (!confirm(`Delete the space "${sp.name}"? Its folders move to Team.`)) return;
+      await call('spaces:delete', sp.id); if (route.view === 'space' && route.id === sp.id) go({ view: 'home' }); else renderFolders();
+    }, true) : null);
+}
+
+// Drop targets.
+async function dropOnFolder(targetId) {
+  const d = dragging; dragging = null;
+  if (!d) return;
+  if (d.kind === 'call') {
+    for (const cid of d.ids || [d.id]) { const r = await call('calls:move', { id: cid, folderId: targetId }); if (!r.ok) { alert(r.error); break; } }
+    clearSelection();
+  } else if (d.kind === 'folder') {
+    if (d.id === targetId || descendants(d.id).includes(targetId)) return;
+    const target = foldersCache.find((x) => x.id === targetId);
+    const moving = foldersCache.find((x) => x.id === d.id);
+    if (target && moving && spaceOf(target) !== spaceOf(moving)) {
+      const r1 = await call('folders:toSpace', { id: d.id, target: spaceOf(target) });
+      if (!r1.ok) { alert(r1.error); return; }
+    }
+    const r = await call('folders:update', { id: d.id, patch: { parentId: targetId } });
+    if (!r.ok) alert(r.error);
+    collapsed.delete(targetId); saveCollapsed();
+  }
+  renderFolders(); renderList();
+  if (route.view === 'folder') renderFolder(route.id);
+}
+
+async function dropOnSpace(space) {
+  const d = dragging; dragging = null;
+  if (!d) return;
+  if (d.kind === 'folder') {
+    const r = await call('folders:toSpace', { id: d.id, target: space });
+    if (!r.ok) alert(r.error);
+  } else if (d.kind === 'call' && (space === 'mine' || space === 'team')) {
+    for (const cid of d.ids || [d.id]) { const r = await call('calls:visibility', { id: cid, visibility: space === 'mine' ? 'private' : 'team' }); if (!r.ok) { alert(r.error); break; } }
+    clearSelection();
+  }
+  collapsed.delete(`s:${space}`); saveCollapsed();
+  renderFolders(); renderList();
+}
+
+function dropZone(el, onDrop, accepts = () => true) {
+  el.addEventListener('dragover', (e) => { if (!dragging || !accepts(dragging)) return; e.preventDefault(); el.classList.add('drop'); });
+  el.addEventListener('dragleave', () => el.classList.remove('drop'));
+  el.addEventListener('drop', (e) => { if (!dragging) return; e.preventDefault(); el.classList.remove('drop'); onDrop(); });
+}
+
+function makeDraggable(el, kind, id) {
+  el.setAttribute('draggable', 'true');
+  el.addEventListener('dragstart', (e) => {
+    const ids = kind === 'call' ? dragIds(id) : [id];
+    dragging = { kind, id, ids };
+    e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id);
+    if (kind === 'call') dragBadge(e, ids.length);
+    el.classList.add('dragging');
+  });
+  el.addEventListener('dragend', () => { el.classList.remove('dragging'); setTimeout(() => { dragging = null; }, 0); });
+}
+
+function inlineRename(value, onDone) {
+  const input = h('input', { class: 'rename', value, onclick: (e) => e.stopPropagation(),
+    onkeydown: (e) => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') { e.target.value = value; e.target.blur(); } },
+    onblur: (e) => onDone(e.target.value.trim()) });
+  setTimeout(() => { input.focus(); input.select(); }, 10);
+  return input;
+}
+
+function folderRow(f, depth) {
+  const children = foldersCache.filter((x) => x.parentId === f.id);
+  const open = !collapsed.has(f.id);
+  const on = route.view === 'folder' && route.id === f.id;
+  const chevron = children.length
+    ? h('button', { class: `chev ${open ? 'open' : ''}`, type: 'button', 'aria-label': open ? 'Collapse' : 'Expand', html: ICON.chev, onclick: (e) => { e.stopPropagation(); open ? collapsed.add(f.id) : collapsed.delete(f.id); saveCollapsed(); renderFolders(); } })
+    : h('span', { class: 'chev-space' });
+  const label = renamingFolder === f.id
+    ? inlineRename(f.name, async (v) => { renamingFolder = null; if (v && v !== f.name) await call('folders:update', { id: f.id, patch: { name: v } }); renderFolders(); if (route.view === 'folder' && route.id === f.id) renderFolder(f.id); })
+    : h('span', { class: 'grow' }, f.name);
+  const row = h('div', { class: `folder-row ${on ? 'on' : ''}`, style: `padding-left:${4 + depth * 14}px`, onclick: () => go({ view: 'folder', id: f.id }),
+    ondblclick: (e) => { e.stopPropagation(); renamingFolder = f.id; renderFolders(); } },
+    chevron,
+    h('button', { class: 'icon-btn-f', type: 'button', title: 'Change icon', onclick: (e) => { e.stopPropagation(); pickerFor = pickerFor === `f:${f.id}` ? null : `f:${f.id}`; menuFor = null; renderFolders(); } }, folderIcon(f)),
+    label,
+    f.count ? h('span', { class: 'n' }, f.count) : null,
+    h('button', { class: 'dots', type: 'button', title: 'More', 'aria-label': `More for ${f.name}`, html: ICON.dots, onclick: (e) => { e.stopPropagation(); menuFor = menuFor === `f:${f.id}` ? null : `f:${f.id}`; pickerFor = null; renderFolders(); } }));
+  if (renamingFolder !== f.id) makeDraggable(row, 'folder', f.id);
+  dropZone(row, () => dropOnFolder(f.id), (d) => !(d.kind === 'folder' && (d.id === f.id || descendants(d.id).includes(f.id))));
+  const out = [h('div', { class: 'folder-wrap' }, row,
+    menuFor === `f:${f.id}` ? folderMenu(f) : null,
+    pickerFor === `f:${f.id}` ? iconPicker((icon) => call('folders:update', { id: f.id, patch: { icon } }).then(() => { if (route.view === 'folder' && route.id === f.id) renderFolder(f.id); })) : null)];
+  if (open) for (const c of children) out.push(...folderRow(c, depth + 1));
+  if (addingFolder && addingFolder.parent === f.id) out.push(newFolderInput(addingFolder, depth + 1));
+  return out;
+}
+
+function newFolderInput(spec, depth) {
+  const input = h('input', { class: 'input', placeholder: 'Folder name' });
+  const form = h('form', { class: 'folder-add', style: `padding-left:${18 + depth * 14}px`, onsubmit: async (e) => {
+    e.preventDefault();
+    const v = input.value.trim();
+    addingFolder = null;
+    if (v) { const r = await call('folders:create', { name: v, parentId: spec.parent || null, space: spec.space }); if (r.ok) { await renderFolders(); go({ view: 'folder', id: r.id }); return; } alert(r.error); }
+    renderFolders();
+  } }, input);
+  input.addEventListener('blur', () => { if (!input.value.trim()) { addingFolder = null; renderFolders(); } });
+  input.addEventListener('keydown', (e) => { if (e.key === 'Escape') { addingFolder = null; renderFolders(); } });
+  setTimeout(() => input.focus(), 10);
+  return form;
+}
+
+function spaceRow(sp) {
+  const key = `s:${sp.id}`;
+  const folders = topFolders(sp.id);
+  const open = !collapsed.has(key);
+  const on = route.view === 'space' && route.id === sp.id;
+  const icon = sp.id === 'mine' ? h('span', { class: 'space-ico lock-ico', html: ICON.lock })
+    : sp.id === 'team' ? h('img', { class: 'space-ico', src: 'assets/logo.svg', alt: '' })
+    : h('button', { class: 'icon-btn-f', type: 'button', title: 'Change icon', onclick: (e) => { e.stopPropagation(); pickerFor = pickerFor === key ? null : key; menuFor = null; renderFolders(); } },
+      sp.icon ? h('span', { class: 'f-emoji', style: 'font-size:13px;width:15px' }, sp.icon) : h('span', { class: 'space-letter' }, (sp.name || '?')[0].toUpperCase()));
+  const label = renamingSpace === sp.id
+    ? inlineRename(sp.name, async (v) => { renamingSpace = null; if (v && v !== sp.name) await call('spaces:update', { id: sp.id, patch: { name: v } }); renderFolders(); })
+    : h('span', { class: 'grow' }, sp.name);
+  const row = h('div', { class: `folder-row space-row ${on ? 'on' : ''}`, onclick: () => go({ view: 'space', id: sp.id }) },
+    folders.length || (addingFolder && addingFolder.space === sp.id && !addingFolder.parent)
+      ? h('button', { class: `chev ${open ? 'open' : ''}`, type: 'button', 'aria-label': open ? 'Collapse' : 'Expand', html: ICON.chev, onclick: (e) => { e.stopPropagation(); open ? collapsed.add(key) : collapsed.delete(key); saveCollapsed(); renderFolders(); } })
+      : h('span', { class: 'chev-space' }),
+    icon, label,
+    h('button', { class: 'dots', type: 'button', title: 'More', 'aria-label': `More for ${sp.name}`, html: ICON.dots, onclick: (e) => { e.stopPropagation(); menuFor = menuFor === key ? null : key; pickerFor = null; renderFolders(); } }));
+  dropZone(row, () => dropOnSpace(sp.id), (d) => d.kind === 'folder' || sp.id === 'mine' || sp.id === 'team');
+  const out = [h('div', { class: 'folder-wrap' }, row,
+    menuFor === key ? spaceMenu(sp) : null,
+    pickerFor === key ? iconPicker((icon) => call('spaces:update', { id: sp.id, patch: { icon } })) : null)];
+  if (open) {
+    for (const f of folders) out.push(...folderRow(f, 1));
+    if (addingFolder && addingFolder.space === sp.id && !addingFolder.parent) out.push(newFolderInput(addingFolder, 1));
+  }
+  return out;
+}
+
+async function renderFolders() {
+  const el = document.getElementById('folders');
+  if (!el) return;
+  if (!authState.user) { el.replaceChildren(); foldersCache = []; spacesCache = []; return; }
+  [foldersCache, spacesCache] = await Promise.all([call('folders:list'), call('spaces:list')]);
+  const spaces = [{ id: 'mine', name: 'My notes' }, { id: 'team', name: 'Team' }, ...spacesCache];
+  const newSpace = addingSpace ? h('form', { class: 'folder-add', style: 'padding-left:22px', onsubmit: async (e) => {
+    e.preventDefault();
+    const v = e.target.querySelector('input').value.trim();
+    addingSpace = false;
+    if (v) { const r = await call('spaces:create', { name: v }); if (!r.ok) alert(r.error); }
+    renderFolders();
+  } }, h('input', { class: 'input', placeholder: 'Space name, e.g. Sales & Operations', onblur: (e) => { if (!e.target.value.trim()) { addingSpace = false; renderFolders(); } } })) : null;
+  // The heading stays put; what's under each space folds.
+  el.replaceChildren(
+    h('div', { class: 'side-label row-label' }, h('span', { class: 'grow' }, 'Spaces'),
+      h('button', { class: 'mini-btn', title: 'New space', 'aria-label': 'New space', html: ICON.plus, onclick: () => { addingSpace = true; renderFolders(); } })),
+    ...spaces.flatMap(spaceRow), newSpace);
+  if (newSpace) setTimeout(() => newSpace.querySelector('input').focus(), 10);
+}
+document.addEventListener('click', () => { if (menuFor || pickerFor) { menuFor = null; pickerFor = null; renderFolders(); } });
+
+async function renderFolder(id) {
+  if (!foldersCache.some((x) => x.id === id)) foldersCache = await call('folders:list');
+  const f = foldersCache.find((x) => x.id === id);
+  if (!f) return go({ view: 'home' });
+  const meetings = await call('folders:meetings', id);
+  const saveName = debounce(async (v) => { await call('folders:update', { id, patch: { name: v } }); renderFolders(); }, 500);
+  const blocked = new Set([id, ...descendants(id)]);
+  const parentOpts = foldersCache.filter((x) => !blocked.has(x.id)).map((x) => h('option', { value: x.id, selected: x.id === f.parentId }, folderPath(x.id)));
+  await loadCompanyNames();
+  const out = callRows(meetings);
+  const iconBtn = h('button', { class: 'big-icon', type: 'button', title: 'Change icon', onclick: (e) => { e.stopPropagation(); pickerFor = `f:${f.id}`; renderFolders(); document.getElementById('main').scrollTop = 0; } }, f.icon || h('span', { class: 'folder-ico big', html: ICON.folder }));
+  $view.replaceChildren(
+    h('div', { class: 'folder-head' }, iconBtn,
+      h('input', { class: 'title-input', value: f.name, placeholder: 'Folder name', oninput: (e) => saveName(e.target.value) })),
+    h('div', { class: 'row folder-tools', style: 'margin:-8px 0 22px;gap:12px' },
+      h('span', { class: 'saved' }, `${meetings.length} call${meetings.length === 1 ? '' : 's'}`),
+      h('label', { class: 'lbl' }, 'Inside ', h('select', { class: 'chip-select', onchange: async (e) => { const r = await call('folders:update', { id, patch: { parentId: e.target.value || null } }); if (!r.ok) alert(r.error); renderFolders(); renderFolder(id); } },
+        h('option', { value: '' }, 'Top level'), parentOpts)),
+      h('button', { class: `chip-btn ${f.private ? 'on' : ''}`, onclick: async () => {
+        const r = await call('folders:visibility', { id, visibility: f.private ? 'team' : 'private' });
+        if (!r.ok) { alert(r.error); return; }
+        await renderFolders(); renderFolder(id);
+      } }, h('span', { html: f.private ? ICON.lock : ICON.team, style: 'display:inline-grid;width:12px;height:12px;vertical-align:-1px;margin-right:5px' }), f.private ? 'Only me' : 'Shared with team'),
+      h('span', { class: 'grow' }),
+      h('button', { class: 'link-btn', onclick: () => { addingFolder = { parent: id, space: spaceOf(f) }; collapsed.delete(id); saveCollapsed(); renderFolders(); } }, 'New sub-folder'),
+      h('button', { class: 'link-btn danger', onclick: async () => {
+        if (!confirm(`Delete the folder "${f.name}"? Its calls stay in All calls, and folders inside it move up.`)) return;
+        await call('folders:delete', id); await renderFolders(); go({ view: 'home' });
+      } }, 'Delete')),
+    meetings.length ? h('div', { class: 'folder-list' }, out) : h('div', { class: 'placeholder' }, 'No calls here yet. Drag a call from the sidebar onto this folder, or pick the folder at the top of a call.'),
+  );
+}
+
+// The folder picker and privacy toggle shown on a call.
+function folderPicker(c) {
+  if (!authState.user || !foldersCache.length) return null;
+  const opts = foldersCache.slice().sort((a, b) => folderPath(a.id).localeCompare(folderPath(b.id)))
+    .map((f) => h('option', { value: f.id, selected: f.id === c.folderId }, `${f.icon ? `${f.icon} ` : ''}${folderPath(f.id)}${f.private ? ' (private)' : ''}`));
+  return h('select', { class: 'chip-select', title: 'Move to folder', onchange: async (e) => {
+    const r = await call('calls:move', { id: c.id, folderId: e.target.value || null });
+    if (!r.ok) alert(r.error);
+    renderFolders(); renderCall(c.id);
+  } }, h('option', { value: '' }, 'No folder'), opts);
+}
+
+function privacyToggle(c) {
+  if (!authState.user || c.mine === false) return null;
+  const priv = c.visibility === 'private';
+  return h('button', { class: `chip-btn ${priv ? 'on' : ''}`, title: priv ? 'Only you can see this call' : 'Your team can see this call', onclick: async () => {
+    const r = await call('calls:visibility', { id: c.id, visibility: priv ? 'team' : 'private' });
+    if (!r.ok) { alert(r.error); return; }
+    renderCall(c.id); renderList();
+  } }, h('span', { html: priv ? ICON.lock : ICON.team, style: 'display:inline-grid;width:12px;height:12px;vertical-align:-1px;margin-right:5px' }), priv ? 'Only me' : 'Team');
+}
+
+// Share link: anyone with it can read the notes and transcript until it's turned off.
+function shareButton(c) {
+  if (!authState.user || c.status === 'live' || c.status === 'writing') return null;
+  const box = h('div', { class: 'share-box', hidden: true });
+  const btn = h('button', { class: 'chip-btn', title: 'Make a link anyone can open', onclick: async () => {
+    box.hidden = !box.hidden;
+    if (!box.hidden) fill(await call('share:get', c.id));
+  } }, h('span', { html: ICON.link || '', style: 'display:inline-grid;width:12px;height:12px;vertical-align:-1px;margin-right:5px' }), 'Share');
+  const copy = async (url, el) => { await navigator.clipboard.writeText(url).catch(() => {}); el.textContent = 'Copied'; setTimeout(() => { el.textContent = 'Copy link'; }, 1500); };
+  function fill(share) {
+    if (!share) {
+      box.replaceChildren(
+        h('div', { class: 'share-tx' }, h('b', {}, 'Share this call'), h('span', {}, 'Makes a private link to the notes and transcript. Anyone who has it can read them until you turn it off.')),
+        h('button', { class: 'btn primary', onclick: async (e) => {
+          e.target.disabled = true; e.target.textContent = 'Making link…';
+          const r = await call('share:create', c.id);
+          if (!r.ok) { alert(r.error); fill(null); return; }
+          fill(r); copy(r.url, box.querySelector('.copy-btn'));
+        } }, 'Create link'));
+      return;
+    }
+    box.replaceChildren(
+      h('input', { class: 'input share-url', readonly: true, value: share.url, onclick: (e) => e.target.select() }),
+      h('button', { class: 'btn copy-btn', onclick: (e) => copy(share.url, e.target) }, 'Copy link'),
+      h('button', { class: 'link-btn danger', onclick: async () => {
+        if (!confirm('Turn this link off? Anyone who has it will stop being able to open it.')) return;
+        const r = await call('share:remove', c.id);
+        if (!r.ok) { alert(r.error); return; }
+        fill(null);
+      } }, 'Turn off'),
+      h('div', { class: 'share-note' }, `Opened ${share.views || 0} time${share.views === 1 ? '' : 's'}. Typed private notes and emails are never shown.`));
+  }
+  return [btn, box];
+}
+
+// A one-line reminder on Home until your calendar is connected.
+async function calendarNudge() {
+  if (!authState.user || localStorage.getItem('cue-cal-nudge-off')) return null;
+  const cal = await call('calendar:status');
+  if (cal.configured) return null;
+  const bar = h('div', { class: 'nudge-bar' },
+    h('span', { class: 'grow' }, 'Connect your calendar so calls get their real titles and attendees.'),
+    h('button', { class: 'btn primary', onclick: async () => { await call('calendar:connect'); go({ view: 'settings' }); } }, 'Connect'),
+    h('button', { class: 'link-btn', onclick: () => { localStorage.setItem('cue-cal-nudge-off', '1'); bar.remove(); } }, 'Not now'));
+  return bar;
+}
+
+window.cue.on('folders:changed', () => { renderFolders(); if (route.view === 'folder') renderFolder(route.id); });

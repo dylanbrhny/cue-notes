@@ -1,0 +1,4 @@
+/* Synapse brand type (same as synapsemfg.com): Cal Sans for headings, Inter for text.
+   Both are open-licensed (SIL OFL), bundled so the app needs no network for fonts. */
+@font-face { font-family: 'Cal Sans'; font-style: normal; font-weight: 400; font-display: swap; src: url('CalSans.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: swap; src: url('Inter.woff2') format('woff2'); }
