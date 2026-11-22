@@ -595,7 +595,7 @@ async function renderPresetsInner() {
         ? 'Walk through a call with this template: the call card, “Meeting over?” and the notes.'
         : `Walk through every stage of a call on the real call card, with this preset’s ${p.checklist.length} beat${p.checklist.length === 1 ? '' : 's'} and ${(p.objections || []).length} objection${(p.objections || []).length === 1 ? '' : 's'}. Nothing is recorded.`)),
       h('div', { class: 'try-btns' },
-      WEB ? h('span', { class: 'hint' }, 'Previews run in the desktop app.') : h('button', { class: 'btn primary allow', onclick: async () => {
+      h('button', { class: 'btn primary allow', onclick: async () => {
         const r = await call('preview:start', JSON.parse(JSON.stringify(p)));
         if (!r.ok) tryOut.textContent = r.error;
       } }, '▶ Preview on a call'),
