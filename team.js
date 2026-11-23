@@ -296,7 +296,7 @@ async function teamSettingsPanels(s) {
 async function renderAdmin() {
   if (authState.user?.role !== 'admin') return go({ view: 'settings' });
   const panels = [];
-  panels.push(await simulatorPanel(), await devicesPanel(), await adminPanel());
+  panels.push(await simulatorPanel(), await devicesPanel(), await contextPanel(), await adminPanel());
 
   // Who we are + how we sell
   const ws = await call('workspace:get');
@@ -438,6 +438,48 @@ async function simulatorPanel() {
     detectRow, leaveRow, visibleRow,
     h('div', { class: 'row', style: 'margin:6px 0 4px;gap:12px' }, run, h('button', { class: 'btn', onclick: () => call('call:stop') }, 'End the running call')),
     status);
+}
+
+// Admin → Names from your records: where Cue learns how people and companies
+// are spelled (Salesforce bookings, Slack booking posts, Drive call lists).
+const SLACK_MANIFEST = {
+  display_information: { name: 'Cue', description: 'Reads booking posts so Cue spells names right in call notes.' },
+  features: { bot_user: { display_name: 'Cue', always_online: false } },
+  oauth_config: { scopes: { bot: ['channels:read', 'channels:history', 'channels:join', 'groups:read', 'groups:history', 'users:read'] } },
+  settings: { org_deploy_enabled: false, socket_mode_enabled: false, token_rotation_enabled: false },
+};
+async function contextPanel() {
+  if (WEB) return h('div', { class: 'panel' }, h('h3', {}, 'Names from your records'), h('div', { class: 'hint' }, 'Set up from the Cue desktop app.'));
+  const st = await call('context:status');
+  const ago = (t) => { if (!t) return 'never'; const m = Math.round((Date.now() - Date.parse(t)) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
+  const row = (name, ok, text, extra) => h('div', { class: 'ctx-row' }, h('span', { class: `dot ${ok === true ? 'ok' : ok === false ? 'bad' : ''}` }), h('b', {}, name), h('span', { class: 'grow' }, text), extra || null);
+  const s = st.synced || {};
+  const line = (src) => (s[src]?.error ? `Last sync failed: ${s[src].error}` : `${(st.counts[src] || 0).toLocaleString()} names · synced ${ago(s[src]?.at)}`);
+  const out = h('div', { class: 'test-out' });
+  const token = h('input', { type: 'password', class: 'input', placeholder: 'xoxb-…', autocomplete: 'off', style: 'flex:1' });
+  const slackBox = h('div', { class: 'ctx-slack', hidden: true },
+    h('ol', { class: 'cal-steps' },
+      h('li', {}, h('a', { href: `https://api.slack.com/apps?new_app=1&manifest_json=${encodeURIComponent(JSON.stringify(SLACK_MANIFEST))}`, target: '_blank', rel: 'noopener' }, 'Create the Cue app in Slack'), ' (opens Slack with everything filled in), then click ', h('b', {}, 'Create'), '.'),
+      h('li', {}, 'Click ', h('b', {}, 'Install to Workspace'), ' and allow it.'),
+      h('li', {}, 'Copy the ', h('b', {}, 'Bot User OAuth Token'), ' (starts with xoxb-) and paste it here. Private channels: invite @Cue to them.')),
+    h('div', { class: 'row', style: 'gap:8px' }, token, h('button', { class: 'btn primary', onclick: async (e) => {
+      e.target.disabled = true; out.textContent = 'Checking…';
+      const r = await call('context:slackToken', token.value);
+      e.target.disabled = false;
+      out.textContent = r.ok ? 'Slack connected. Reading the channels now.' : r.error;
+      if (r.ok) setTimeout(renderView, 1500);
+    } }, 'Connect')));
+  return h('div', { class: 'panel' },
+    h('div', { class: 'row' }, h('h3', { class: 'grow', style: 'margin:0' }, 'Names from your records'),
+      h('button', { class: 'btn', disabled: st.running, onclick: async (e) => { e.target.disabled = true; e.target.textContent = 'Syncing…'; await call('context:sync'); setTimeout(renderView, 4000); } }, st.running ? 'Syncing…' : 'Sync now')),
+    h('div', { class: 'hint', style: 'margin:6px 0 12px' }, 'Cue checks call notes against these, so people and companies are spelled right (Salesforce bookings, Slack booking posts, the callers’ contact lists). Your Mac refreshes them every 6 hours; Grant and Christian’s notes use them too.'),
+    row('Salesforce', st.salesforce ? !s.salesforce?.error : false, st.salesforce ? line('salesforce') : 'The Salesforce CLI (sf) isn’t on this Mac.'),
+    row('Slack', st.slack ? !s.slack?.error : null, st.slack ? line('slack') : 'Not connected yet.',
+      st.slack ? h('button', { class: 'link-btn danger', onclick: async () => { if (!confirm('Disconnect Slack? Cue stops reading booking posts.')) return; await call('context:slackToken', ''); renderView(); } }, 'Disconnect')
+        : h('button', { class: 'btn', onclick: () => { slackBox.hidden = !slackBox.hidden; } }, 'Connect Slack')),
+    slackBox,
+    row('Google Drive', st.drive ? !s.drive?.error : false, st.drive ? line('drive') : 'Google Drive for desktop isn’t mirroring “Client Data Exports” on this Mac.'),
+    out);
 }
 
 async function devicesPanel() {

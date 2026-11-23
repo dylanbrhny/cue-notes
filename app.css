@@ -716,3 +716,11 @@ a.start-btn.web-get { display: flex; align-items: center; justify-content: cente
 .beat-stat { font-size: 11px; color: var(--text-3); margin-left: 8px; }
 .beat-stat.good { color: var(--green); } .beat-stat.bad { color: var(--red); }
 @media (max-width: 900px) { .wins-sum { grid-template-columns: repeat(2, 1fr); } }
+
+/* Admin → Names from your records */
+.ctx-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.ctx-row b { width: 110px; flex: none; }
+.ctx-row .grow { color: var(--text-3); font-size: 12.5px; }
+.ctx-row .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line-2); flex: none; }
+.ctx-row .dot.ok { background: var(--green); } .ctx-row .dot.bad { background: var(--amber); }
+.ctx-slack { margin: 4px 0 10px 18px; }
