@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-dHYv82cPTRWC9zDt7xtBiC93LSHLGfT2jAMFBOn3wBo='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://vnukfvbmimakiotsanjv.supabase.co; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZFIqtko39YINg77Ur1QP8tCVcgLUf5mDuVT/zAnFicg='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://vnukfvbmimakiotsanjv.supabase.co; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <meta name="theme-color" content="#070b16">
@@ -798,7 +798,7 @@ footer{border-top:1px solid var(--line)}
     } catch (e) { return Promise.resolve(false); }
   }
 
-  fetch(BASE + '/latest.json', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (rel) {
+  fetch(BASE + '/latest.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (rel) {
     ['mac', 'win'].forEach(function (os) {
       var a = rel[os]; var btn = $('btn-' + os);
       if (!a) { btn.textContent = 'Not available yet'; return; }
