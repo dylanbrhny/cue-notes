@@ -366,7 +366,7 @@ async function renderSpace(id) {
   const sub = id === 'mine' ? 'Only you can see these: calls you recorded and your private folders.' : id === 'team' ? 'Shared with the whole team.' : id === 'clients' ? 'Calls recorded by people at your clients with Cue for clients. Each client only sees their own.' : 'A shared space for its own folders.';
   $view.replaceChildren(
     h('div', { class: 'folder-head' },
-      h('span', { class: 'big-icon' }, id === 'mine' ? h('span', { class: 'lock-ico big', html: ICON.lock }) : id === 'team' ? h('img', { src: 'assets/logo.svg', style: 'width:30px;height:30px;border-radius:8px' }) : (sp.icon || h('span', { class: 'space-letter big' }, sp.name[0].toUpperCase()))),
+      h('span', { class: 'big-icon' }, id === 'mine' ? h('span', { class: 'lock-ico big', html: ICON.lock }) : id === 'team' ? h('img', { src: 'assets/logo.svg', style: 'width:30px;height:30px;border-radius:8px' }) : (cueIcon(id === 'clients' ? 'handshake' : sp.icon, 30) || h('span', { class: 'space-letter big' }, sp.name[0].toUpperCase()))),
       h('h1', { class: 'page', style: 'margin:0' }, sp.name)),
     h('p', { class: 'sub', style: 'margin-top:-8px' }, sub),
     folders.length ? h('div', { class: 'section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Folders')),

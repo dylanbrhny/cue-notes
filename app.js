@@ -32,29 +32,40 @@ let TEAM_EMAILS = new Set();
 const isClientUser = () => authState.user?.role === 'client';
 const isOurs = (e) => /@synapsemfg\.com$/i.test(e || '') || TEAM_EMAILS.has(String(e || '').toLowerCase());
 const loadTeamEmails = () => call('team:emails').then((l) => { if (Array.isArray(l) && l.length) TEAM_EMAILS = new Set(l); }).catch(() => {});
+// Line icons drawn like the Master Inbox's (24px grid, 1.6 stroke).
+const lineIcon = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`;
 const ICON = {
   check: '<svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2l2.3 2.3 4.7-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  calls: '<svg viewBox="0 0 16 16" fill="none"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5" stroke="currentColor" stroke-width="1.4"/><path d="M5 6h6M5 8.5h6M5 11h3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
-  presets: '<svg viewBox="0 0 16 16" fill="none"><path d="M4 4.5l1.2 1.2L7.5 3.4M4 9l1.2 1.2L7.5 7.9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.5 5h3M9.5 9.5h3M4 13h8.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
-  settings: '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.8v1.6M8 12.6v1.6M14.2 8h-1.6M3.4 8H1.8M12.4 3.6l-1.1 1.1M4.7 11.3l-1.1 1.1M12.4 12.4l-1.1-1.1M4.7 4.7L3.6 3.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+  home: lineIcon('M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z'),
+  calls: lineIcon('M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8'),
+  presets: lineIcon('M10 6h10 M10 12h10 M10 18h10 M4 6l1.2 1.2L7.5 5 M4 12l1.2 1.2 2.3-2.2 M4 18l1.2 1.2 2.3-2.2'),
+  settings: lineIcon('M4 21v-7 M4 10V3 M12 21v-9 M12 8V3 M20 21v-5 M20 12V3 M1 14h6 M9 8h6 M17 16h6'),
   chev: '<svg viewBox="0 0 12 12" fill="none"><path d="M4.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  link: '<svg viewBox="0 0 16 16" fill="none"><path d="M6.8 9.2a2.6 2.6 0 0 0 3.7 0l2.2-2.2a2.6 2.6 0 0 0-3.7-3.7l-.9.9M9.2 6.8a2.6 2.6 0 0 0-3.7 0L3.3 9a2.6 2.6 0 0 0 3.7 3.7l.9-.9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+  link: lineIcon('M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71 M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71'),
   dots: '<svg viewBox="0 0 16 16" fill="none"><circle cx="4" cy="8" r="1.2" fill="currentColor"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/><circle cx="12" cy="8" r="1.2" fill="currentColor"/></svg>',
-  lock: '<svg viewBox="0 0 12 12" fill="none"><rect x="2.5" y="5.2" width="7" height="5" rx="1.2" stroke="currentColor" stroke-width="1.2"/><path d="M4 5.2V4a2 2 0 0 1 4 0v1.2" stroke="currentColor" stroke-width="1.2"/></svg>',
-  team: '<svg viewBox="0 0 12 12" fill="none"><circle cx="4.3" cy="4.2" r="1.7" stroke="currentColor" stroke-width="1.1"/><circle cx="8.4" cy="4.8" r="1.4" stroke="currentColor" stroke-width="1.1"/><path d="M1.4 10c.3-1.7 1.5-2.6 2.9-2.6s2.6.9 2.9 2.6M7.4 7.6c1.5-.3 2.9.4 3.2 2.2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>',
-  notesTab: '<svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2.5" width="10" height="11" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 6h5M5.5 8.5h5M5.5 11h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
-  companyTab: '<svg viewBox="0 0 16 16" fill="none"><path d="M2.5 13.5h11M3.5 13.5V6.5l4-2v9M7.5 13.5V3l5 2.5v8" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M9.5 7.5h1M9.5 10h1M5 8.5h.8M5 11h.8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
-  personTab: '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5.5" r="2.5" stroke="currentColor" stroke-width="1.3"/><path d="M3 13.5c.6-2.6 2.6-4 5-4s4.4 1.4 5 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
-  filesTab: '<svg viewBox="0 0 16 16" fill="none"><path d="M8 2.5l5.5 2.8L8 8.1 2.5 5.3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 8l5.5 2.8L13.5 8M2.5 10.7l5.5 2.8 5.5-2.8" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
-  folder: '<svg viewBox="0 0 16 16" fill="none"><path d="M2.5 4.5a1.5 1.5 0 0 1 1.5-1.5h2.4l1.4 1.6H12a1.5 1.5 0 0 1 1.5 1.5v5.4a1.5 1.5 0 0 1-1.5 1.5H4a1.5 1.5 0 0 1-1.5-1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
-  live: '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="1.8" fill="currentColor"/><path d="M5.2 5.2a4 4 0 0 0 0 5.6M10.8 5.2a4 4 0 0 1 0 5.6M3.3 3.3a6.6 6.6 0 0 0 0 9.4M12.7 3.3a6.6 6.6 0 0 1 0 9.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
-  sparkle: '<svg viewBox="0 0 16 16" fill="none"><path d="M8 2.5l1.3 3.2 3.2 1.3-3.2 1.3L8 11.5 6.7 8.3 3.5 7l3.2-1.3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M12.5 11v3M11 12.5h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
-  archive: '<svg viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M3 6v6a1.5 1.5 0 0 0 1.5 1.5h7A1.5 1.5 0 0 0 13 12V6M6.5 8.8h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
-  unarchive: '<svg viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M3 6v6a1.5 1.5 0 0 0 1.5 1.5h7A1.5 1.5 0 0 0 13 12V6M8 12V8.2M6.4 9.6L8 8l1.6 1.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  trash: '<svg viewBox="0 0 16 16" fill="none"><path d="M3 4.5h10M6.5 4.5V3.2c0-.4.3-.7.7-.7h1.6c.4 0 .7.3.7.7v1.3M4.3 4.5l.6 8.1c.1.8.7 1.4 1.5 1.4h3.2c.8 0 1.4-.6 1.5-1.4l.6-8.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  trophy: '<svg viewBox="0 0 16 16" fill="none"><path d="M5 2.5h6v3.2a3 3 0 0 1-6 0zM5 3.5H3a2 2 0 0 0 2 2.6M11 3.5h2a2 2 0 0 1-2 2.6M8 8.7v2.3M5.5 13.5h5M6.3 13.5c0-1.3.7-2.5 1.7-2.5s1.7 1.2 1.7 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  shield: '<svg viewBox="0 0 16 16" fill="none"><path d="M8 1.8l5 2v3.9c0 3.1-2.1 5.6-5 6.5-2.9-.9-5-3.4-5-6.5V3.8z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.8 8l1.6 1.6 2.9-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  plus: '<svg viewBox="0 0 16 16" fill="none"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+  lock: lineIcon('M6 11h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z M8 11V7a4 4 0 0 1 8 0v4'),
+  team: lineIcon('M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75'),
+  notesTab: lineIcon('M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8'),
+  companyTab: lineIcon('M3 21h18 M5 21V7l8-4v18 M19 21V11l-6-4 M9 9h.01 M9 12h.01 M9 15h.01 M9 18h.01'),
+  personTab: lineIcon('M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'),
+  filesTab: lineIcon('M12 2 2 7l10 5 10-5-10-5z M2 17l10 5 10-5 M2 12l10 5 10-5'),
+  folder: lineIcon('M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z'),
+  live: lineIcon('M4.9 19.1a10 10 0 0 1 0-14.2 M7.8 16.2a6 6 0 0 1 0-8.4 M16.2 7.8a6 6 0 0 1 0 8.4 M19.1 4.9a10 10 0 0 1 0 14.2 M14 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0z'),
+  sparkle: lineIcon('M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z M19 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z'),
+  archive: lineIcon('M21 8v13H3V8 M1 3h22v5H1z M10 12h4'),
+  unarchive: lineIcon('M21 8v13H3V8 M1 3h22v5H1z M12 18v-6 M9.5 14.5 12 12l2.5 2.5'),
+  trash: lineIcon('M3 6h18 M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6 M10 11v6 M14 11v6 M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2'),
+  trophy: lineIcon('M6 9H4.5a2.5 2.5 0 0 1 0-5H6 M18 9h1.5a2.5 2.5 0 0 0 0-5H18 M4 22h16 M10 14.7V17c0 .6-.5 1-1 1.2C7.9 18.8 7 20.2 7 22 M14 14.7V17c0 .6.5 1 1 1.2 1.1.6 2 2 2 3.8 M18 2H6v7a6 6 0 0 0 12 0V2z'),
+  shield: lineIcon('M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z M9 12l2 2 4-4'),
+  plus: lineIcon('M12 5v14 M5 12h14'),
+  pen: lineIcon('M12 20h9 M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z'),
+  globe: lineIcon('M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M2 12h20 M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z'),
+  laptop: lineIcon('M4 5h16a1 1 0 0 1 1 1v10H3V6a1 1 0 0 1 1-1z M1 19h22'),
+  back: lineIcon('M19 20 9 12l10-8v16z M5 19V5'),
+  next: lineIcon('M5 4l10 8-10 8V4z M19 5v14'),
+  play: lineIcon('M6 3l14 9-14 9V3z'),
+  pause: lineIcon('M6 4h4v16H6z M14 4h4v16h-4z'),
+  x: lineIcon('M18 6 6 18 M6 6l12 12'),
 };
 
 function h(tag, attrs = {}, ...kids) {
@@ -124,7 +135,8 @@ async function renderStart() {
   const presets = presetsCache || (presetsCache = await call('presets:get'));
   const templates = templatesCache || (templatesCache = await call('notes:templates'));
   const btn = h('button', { class: 'start-btn', onclick: (e) => { e.stopPropagation(); menuOpen = !menuOpen; renderStart(); } },
-    h('span', { html: ICON.plus, style: 'width:14px;height:14px;display:inline-grid' }), 'Start a call');
+    h('span', { html: ICON.plus, style: 'width:16px;height:16px;display:inline-grid' }), 'Start a call',
+    h('span', { class: 'kbd', title: 'Start or stop a call from anywhere' }, /Mac/i.test(navigator.platform) ? '⌥⌘C' : 'Ctrl Alt C'));
   const kids = [btn];
   if (menuOpen) {
     const item = (p) => h('button', { onclick: async () => { menuOpen = false; startKey = ''; await call('call:start', { presetId: p.id }); go({ view: 'live' }); } }, p.name);
@@ -149,8 +161,11 @@ function renderNav() {
     title: n ? `${n} call${n === 1 ? '' : 's'} live now` : 'Nobody is on a call',
     onclick: () => go({ view: 'watch' }),
   }, h('span', { html: ICON.live, style: 'display:inline-grid' }), 'Live', n ? h('span', { class: 'live-count' }, n) : null) : null;
-  if (isClientUser()) { $nav.replaceChildren(item('home', 'Home', 'calls'), item('settings', 'Settings', 'settings')); return; }
-  $nav.replaceChildren(item('home', 'Home', 'calls'), live, authState.user ? item('ask', 'Ask Cue', 'sparkle') : null, authState.user ? item('wins', 'What wins', 'trophy') : null, item('presets', 'Presets', 'presets'), item('settings', 'Settings', 'settings'),
+  // Like the Master Inbox: where you work at the top, setup at the bottom of the sidebar.
+  const $foot = document.getElementById('foot-nav');
+  if (isClientUser()) { $nav.replaceChildren(item('home', 'Home', 'home')); $foot.replaceChildren(item('settings', 'Settings', 'settings')); return; }
+  $nav.replaceChildren(item('home', 'Home', 'home'), live, authState.user ? item('ask', 'Ask Cue', 'sparkle') : null, authState.user ? item('wins', 'What wins', 'trophy') : null);
+  $foot.replaceChildren(item('presets', 'Presets', 'presets'), item('settings', 'Settings', 'settings'),
     authState.user?.role === 'admin' ? item('admin', 'Admin', 'shield') : null);
 }
 
@@ -607,7 +622,7 @@ async function renderPresetsInner() {
       h('button', { class: 'btn primary allow', onclick: async () => {
         const r = await call('preview:start', JSON.parse(JSON.stringify(p)));
         if (!r.ok) tryOut.textContent = r.error;
-      } }, '▶ Preview on a call'),
+      } }, 'Preview on a call'),
       !WEB && isAdmin && p.kind !== 'notes' ? h('button', { class: 'btn', onclick: async (e) => {
         e.target.disabled = true; e.target.textContent = 'Writing a test call… (about 30 s)'; tryOut.textContent = '';
         const r = await call('preview:testCall', JSON.parse(JSON.stringify(p)));
@@ -748,12 +763,15 @@ async function renderSettings() {
       h('span', { class: 'grow' }, h('b', {}, 'Team settings are on the Admin page'), ' · coaching, playbook, presets, devices, calendars, share links, keys and the simulator'),
       h('span', {}, 'Open →')) : null,
     h('div', { class: 'panel', 'data-open': '' }, h('h3', {}, 'Appearance'),
+      // The same three themes as the Master Inbox.
       h('div', { class: 'theme-pick' }, [
-        ['synapse', 'Synapse', '#070b16', ['#4a9eff', '#34d399']],
-        ['dark', 'Dark', '#1c1b19', ['#ecebe6', '#7cc196']],
-        ['light', 'Light', '#fbfaf7', ['#22211e', '#3c7a52']],
-      ].map(([id, label, bg, dots]) => h('button', { class: (s.theme || 'synapse') === id ? 'on' : '', onclick: async () => { applyTheme(id); await save({ theme: id }); renderSettings(); } },
-        h('span', { class: 'sw', style: `background:${bg}` }, h('i', { style: `width:38%;background:${dots[0]}` }), h('i', { style: `width:18%;background:${dots[1]}` })),
+        ['light', 'Light', '#f9f9f8', '#ffffff', ['#37352f', '#2383e2']],
+        ['dark', 'Dark', '#202020', '#191919', ['#ededed', '#2383e2']],
+        ['synapse', 'Synapse', '#0b1120', '#070b16', ['#4a9eff', '#34d399']],
+      ].map(([id, label, side, page, [a, b]]) => h('button', { class: (s.theme || 'light') === id ? 'on' : '', onclick: async () => { applyTheme(id); await save({ theme: id }); renderSettings(); } },
+        h('span', { class: 'sw', style: `background:${page}` },
+          h('span', { class: 's1', style: `background:${side}` }, h('i', { style: `width:80%;background:${a};opacity:.55` }), h('i', { style: `width:60%;background:${a};opacity:.3` }), h('i', { style: `width:70%;background:${a};opacity:.3` })),
+          h('span', { class: 's2' }, h('i', { style: `width:70%;background:${a};opacity:.8` }), h('i', { style: `width:90%;background:${a};opacity:.25` }), h('i', { style: `width:40%;background:${b}` }))),
         label)))),
     ...team,
     authState.user?.role === 'admin' || isClientUser() ? null : await keysPanel(s, keyInput, save, out),
@@ -818,10 +836,10 @@ function drawPreviewBar(info) {
     h('div', { class: 'pv-top' },
       h('span', { class: 'pv-dot' }),
       h('span', { class: 'grow' }, h('b', {}, `Preview · ${info.presetName}`), h('span', {}, `${info.step + 1}/${info.steps.length} · ${info.steps[info.step]}`)),
-      h('button', { class: 'icon-btn', title: 'Back', onclick: () => call('preview:go', -1) }, '◀'),
-      h('button', { class: 'icon-btn', title: info.paused ? 'Play' : 'Pause', onclick: () => call('preview:pause') }, info.paused ? '▶' : '❚❚'),
-      h('button', { class: 'icon-btn', title: 'Next', onclick: () => call('preview:go', 1) }, '▶▶'),
-      h('button', { class: 'icon-btn', title: 'End preview', onclick: () => call('preview:stop') }, '✕')),
+      h('button', { class: 'icon-btn', title: 'Back', 'aria-label': 'Back', html: ICON.back, onclick: () => call('preview:go', -1) }),
+      h('button', { class: 'icon-btn', title: info.paused ? 'Play' : 'Pause', 'aria-label': info.paused ? 'Play' : 'Pause', html: info.paused ? ICON.play : ICON.pause, onclick: () => call('preview:pause') }),
+      h('button', { class: 'icon-btn', title: 'Next', 'aria-label': 'Next', html: ICON.next, onclick: () => call('preview:go', 1) }),
+      h('button', { class: 'icon-btn', title: 'End preview', 'aria-label': 'End preview', html: ICON.x, onclick: () => call('preview:stop') })),
     h('div', { class: 'pv-steps' }, info.steps.map((label, i) => h('button', { class: `pv-step ${i === info.step ? 'on' : i < info.step ? 'past' : ''}`, title: label, onclick: () => call('preview:to', i) }))));
   if (previewBar) previewBar.replaceWith(bar); else document.body.append(bar);
   previewBar = bar;
@@ -839,7 +857,7 @@ window.cue.on('live:state', (st) => {
 });
 
 // Start once every script on the page (app.js, team.js) has run.
-function applyTheme(t) { document.documentElement.dataset.theme = t || 'synapse'; }
+function applyTheme(t) { document.documentElement.dataset.theme = ['light', 'dark', 'synapse'].includes(t) ? t : 'light'; }
 window.addEventListener('DOMContentLoaded', async () => {
   call('settings:get').then((s) => applyTheme(s.theme));
   info = await call('app:info');

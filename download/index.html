@@ -144,7 +144,7 @@ button{font:inherit;color:inherit}
 .mock{border-radius:12px;overflow:hidden;max-width:100%;box-shadow:0 18px 50px rgba(0,0,0,.45);user-select:none}
 .hl{position:relative;box-shadow:0 0 0 3px #4a9eff,0 0 22px rgba(74,158,255,.7)!important;animation:hl 1.8s ease-in-out infinite}
 @keyframes hl{50%{box-shadow:0 0 0 3px #4a9eff,0 0 8px rgba(74,158,255,.3)}}
-.click{position:absolute;right:-14px;bottom:-16px;font-size:22px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
+.click{position:absolute;right:-14px;bottom:-18px;line-height:0;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45))}
 .mac-dialog{background:#ececec;color:#1d1d1f;padding:22px 22px 18px;text-align:center;font:13px -apple-system,'Helvetica Neue','Inter',sans-serif;width:300px;border-radius:14px}
 .mac-dialog .ico{width:54px;height:54px;margin:0 auto 10px}
 .mac-dialog .ico img{width:100%;height:100%;border-radius:13px;display:block}
@@ -271,8 +271,8 @@ footer{border-top:1px solid var(--line)}
     <p class="hero-sub">Cue listens to your call on your own computer and has the notes ready when you hang up. Here is all of it in one minute.</p>
   </div>
   <div class="film">
-    <video id="film" controls muted autoplay loop playsinline preload="metadata" width="1920" height="1080" poster="cue.jpg?v=4f2bf9542b" aria-label="A one-minute tour of Cue: it spots a meeting, takes notes while you talk, and writes them up when the meeting ends.">
-      <source src="cue.mp4?v=4f2bf9542b" type="video/mp4">
+    <video id="film" controls muted autoplay loop playsinline preload="metadata" width="1920" height="1080" poster="cue.jpg?v=0fc99d37f2" aria-label="A one-minute tour of Cue: it spots a meeting, takes notes while you talk, and writes them up when the meeting ends.">
+      <source src="cue.mp4?v=0fc99d37f2" type="video/mp4">
     </video>
     <p class="film-note">Plays without sound. Turn the sound on in the player if you like.</p>
   </div>
@@ -323,19 +323,19 @@ footer{border-top:1px solid var(--line)}
           <h4>Open it once: your Mac will stop it</h4>
           <p>Open Cue from Applications. macOS says it can’t check Cue for malware, because Cue is our own app and isn’t registered with Apple yet. Click <b>Done</b> (not Move to Trash).</p></div>
           <div class="step-m"><div class="mock mac-dialog"><div class="ico"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDI0IiBoZWlnaHQ9IjEwMjQiIHZpZXdCb3g9IjAgMCAxMDI0IDEwMjQiPiA8ZGVmcz4gPGxpbmVhckdyYWRpZW50IGlkPSJiZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPiA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMxZDJiMjMiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwZjE2MTIiLz4gPC9saW5lYXJHcmFkaWVudD4gPGxpbmVhckdyYWRpZW50IGlkPSJzaGVlbiIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPiA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNmZmZmZmYiIHN0b3Atb3BhY2l0eT0iMC4xMCIvPjxzdG9wIG9mZnNldD0iMC41IiBzdG9wLWNvbG9yPSIjZmZmZmZmIiBzdG9wLW9wYWNpdHk9IjAiLz4gPC9saW5lYXJHcmFkaWVudD4gPC9kZWZzPiA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMTAyNCIgaGVpZ2h0PSIxMDI0IiByeD0iMjM2IiBmaWxsPSJ1cmwoI2JnKSIvPiA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMTAyNCIgaGVpZ2h0PSIxMDI0IiByeD0iMjM2IiBmaWxsPSJ1cmwoI3NoZWVuKSIvPiA8cmVjdCB4PSIxLjUiIHk9IjEuNSIgd2lkdGg9IjEwMjEiIGhlaWdodD0iMTAyMSIgcng9IjIzNC41IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS1vcGFjaXR5PSIwLjA4IiBzdHJva2Utd2lkdGg9IjMiLz4gPHBhdGggZD0iTSA2ODEuNCAzNTkuNCBBIDIyOCAyMjggMCAxIDAgNjgxLjQgNjY0LjYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2Y0ZjFlYSIgc3Ryb2tlLXdpZHRoPSI5NiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+IDxjaXJjbGUgY3g9Ijc0MC4wIiBjeT0iNTEyIiByPSI2NC4wIiBmaWxsPSIjNjJkNjlhIi8+PC9zdmc+" alt=""></div><b>“Cue” Not Opened</b><div class="t">Apple could not verify “Cue” is free of malware that may harm your Mac or compromise your privacy.</div>
-            <div class="mac-btns"><div class="mac-btn hl">Done<span class="click">👆</span></div><div class="mac-btn">Move to Trash</div></div></div></div>
+            <div class="mac-btns"><div class="mac-btn hl">Done<span class="click"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 2.5l13 9.2-6.1.9-3.4 5.7z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg></span></div><div class="mac-btn">Move to Trash</div></div></div></div>
         </div>
         <div class="step"><span class="num">3</span><div>
           <h4>Click Open Anyway in System Settings</h4>
           <p>Open <b>System Settings → Privacy &amp; Security</b> and scroll down to <b>Security</b>. Next to “Cue was blocked to protect your Mac”, click <b>Open Anyway</b>.</p></div>
           <div class="step-m"><div class="mock mac-settings"><div class="mac-side"><span>Wi-Fi</span><span>General</span><span>Accessibility</span><span class="on">Privacy &amp; Security</span><span>Desktop &amp; Dock</span></div>
-            <div class="mac-main"><h5>Security</h5><div class="mac-row"><span class="grow">“Cue” was blocked to protect your Mac.</span><span class="mac-small hl">Open Anyway<span class="click">👆</span></span></div></div></div></div>
+            <div class="mac-main"><h5>Security</h5><div class="mac-row"><span class="grow">“Cue” was blocked to protect your Mac.</span><span class="mac-small hl">Open Anyway<span class="click"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 2.5l13 9.2-6.1.9-3.4 5.7z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg></span></span></div></div></div></div>
         </div>
         <div class="step"><span class="num">4</span><div>
           <h4>Confirm</h4>
           <p>Click <b>Open Anyway</b> again, then use Touch ID or your Mac password. You only do this once. After that Cue opens normally and updates itself.</p></div>
           <div class="step-m"><div class="mock mac-dialog"><div class="ico"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDI0IiBoZWlnaHQ9IjEwMjQiIHZpZXdCb3g9IjAgMCAxMDI0IDEwMjQiPiA8ZGVmcz4gPGxpbmVhckdyYWRpZW50IGlkPSJiZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPiA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMxZDJiMjMiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwZjE2MTIiLz4gPC9saW5lYXJHcmFkaWVudD4gPGxpbmVhckdyYWRpZW50IGlkPSJzaGVlbiIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPiA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNmZmZmZmYiIHN0b3Atb3BhY2l0eT0iMC4xMCIvPjxzdG9wIG9mZnNldD0iMC41IiBzdG9wLWNvbG9yPSIjZmZmZmZmIiBzdG9wLW9wYWNpdHk9IjAiLz4gPC9saW5lYXJHcmFkaWVudD4gPC9kZWZzPiA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMTAyNCIgaGVpZ2h0PSIxMDI0IiByeD0iMjM2IiBmaWxsPSJ1cmwoI2JnKSIvPiA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMTAyNCIgaGVpZ2h0PSIxMDI0IiByeD0iMjM2IiBmaWxsPSJ1cmwoI3NoZWVuKSIvPiA8cmVjdCB4PSIxLjUiIHk9IjEuNSIgd2lkdGg9IjEwMjEiIGhlaWdodD0iMTAyMSIgcng9IjIzNC41IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS1vcGFjaXR5PSIwLjA4IiBzdHJva2Utd2lkdGg9IjMiLz4gPHBhdGggZD0iTSA2ODEuNCAzNTkuNCBBIDIyOCAyMjggMCAxIDAgNjgxLjQgNjY0LjYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2Y0ZjFlYSIgc3Ryb2tlLXdpZHRoPSI5NiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+IDxjaXJjbGUgY3g9Ijc0MC4wIiBjeT0iNTEyIiByPSI2NC4wIiBmaWxsPSIjNjJkNjlhIi8+PC9zdmc+" alt=""></div><b>Open “Cue”?</b><div class="t">Apple is not able to verify that it is free from malware. Open only if you trust its source.</div>
-            <div class="mac-btns"><div class="mac-btn blue hl">Open Anyway<span class="click">👆</span></div><div class="mac-btn">Move to Trash</div></div></div></div>
+            <div class="mac-btns"><div class="mac-btn blue hl">Open Anyway<span class="click"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 2.5l13 9.2-6.1.9-3.4 5.7z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg></span></div><div class="mac-btn">Move to Trash</div></div></div></div>
         </div>
         <div class="step"><span class="num">5</span><div>
           <h4>Allow what it asks for</h4>
@@ -350,13 +350,13 @@ footer{border-top:1px solid var(--line)}
           <h4>Keep the download <span class="opt">if your browser asks</span></h4>
           <p>Chrome or Edge may say <b>Cue-Setup.exe isn’t commonly downloaded</b>. Click the <b>…</b> next to it, then <b>Keep</b> (Edge: <b>Show more → Keep anyway</b>).</p></div>
           <div class="step-m"><div class="mock browser"><div class="row"><span class="warn">!</span><span class="grow"><b>Cue-Setup.exe</b> isn’t commonly downloaded. Make sure you trust it before you open it.</span><span>⋯</span></div>
-            <div class="menu"><span class="hl">Keep<span class="click">👆</span></span><span>Delete</span><span>Learn more</span></div></div></div>
+            <div class="menu"><span class="hl">Keep<span class="click"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 2.5l13 9.2-6.1.9-3.4 5.7z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg></span></span><span>Delete</span><span>Learn more</span></div></div></div>
         </div>
         <div class="step"><span class="num">2</span><div>
           <h4>Open the installer, then click More info</h4>
           <p>Open <b>Cue-Setup.exe</b> from your Downloads. Windows shows a blue “Windows protected your PC” screen, because Cue is our own app and isn’t registered with Microsoft yet. Click <b>More info</b>.</p></div>
           <div class="step-m"><div class="mock win-ss"><h5>Windows protected your PC</h5><div class="t">Microsoft Defender SmartScreen prevented an unrecognized app from starting. Running this app might put your PC at risk.</div>
-            <span class="link hl">More info<span class="click">👆</span></span>
+            <span class="link hl">More info<span class="click"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 2.5l13 9.2-6.1.9-3.4 5.7z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg></span></span>
             <div class="win-btns"><span class="win-btn">Don’t run</span></div></div></div>
         </div>
         <div class="step"><span class="num">3</span><div>
@@ -364,12 +364,12 @@ footer{border-top:1px solid var(--line)}
           <p>The screen now shows <b>App: Cue-Setup.exe</b> and <b>Publisher: Unknown publisher</b>. Click <b>Run anyway</b>. Cue installs and opens by itself.</p></div>
           <div class="step-m"><div class="mock win-ss"><h5>Windows protected your PC</h5><div class="t">Microsoft Defender SmartScreen prevented an unrecognized app from starting. Running this app might put your PC at risk.</div>
             <div class="meta"><span>App:</span>Cue-Setup.exe<br><span>Publisher:</span>Unknown publisher</div>
-            <div class="win-btns"><span class="win-btn hl">Run anyway<span class="click">👆</span></span><span class="win-btn">Don’t run</span></div></div></div>
+            <div class="win-btns"><span class="win-btn hl">Run anyway<span class="click"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 2.5l13 9.2-6.1.9-3.4 5.7z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg></span></span><span class="win-btn">Don’t run</span></div></div></div>
         </div>
         <div class="step"><span class="num">4</span><div>
           <h4>If your antivirus removed it <span class="opt">rare</span></h4>
           <p>Open <b>Windows Security → Virus &amp; threat protection → Protection history</b>, open the Cue entry and choose <b>Actions → Allow</b> (or <b>Restore</b>). Then run the installer again.</p></div>
-          <div class="step-m"><div class="mock wsec"><h5>Protection history</h5><div class="item"><b>Threat quarantined</b><span>Cue-Setup.exe · Quarantined</span><div class="acts"><span class="wbtn hl">Allow<span class="click">👆</span></span><span class="wbtn">Restore</span><span class="wbtn">Remove</span></div></div></div></div>
+          <div class="step-m"><div class="mock wsec"><h5>Protection history</h5><div class="item"><b>Threat quarantined</b><span>Cue-Setup.exe · Quarantined</span><div class="acts"><span class="wbtn hl">Allow<span class="click"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 2.5l13 9.2-6.1.9-3.4 5.7z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg></span></span><span class="wbtn">Restore</span><span class="wbtn">Remove</span></div></div></div></div>
         </div>
       </div>
 

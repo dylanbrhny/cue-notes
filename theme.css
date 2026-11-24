@@ -1,66 +1,83 @@
-/* Synapse brand (matches synapsemfg.com): deep navy, soft white text, electric
-   blue accent, green for live/success, Cal Sans headings over Inter. */
+/* Same look as the Master Inbox (inbox.synapsemfg.com): Notion's palette and
+   Inter, with three themes. Light is the default; Dark is Notion's dark;
+   Synapse is the navy of synapsemfg.com. */
 @import url('fonts/fonts.css');
 
-:root {
-  --bg: #070b16;
-  --bg-sunk: #0b1120;
-  --bg-hover: #142038;
-  --card: #0f182b;
-  --text: rgba(255, 255, 255, 0.92);
-  --text-2: rgba(255, 255, 255, 0.72);
-  --text-3: rgba(255, 255, 255, 0.52);
-  --line: rgba(255, 255, 255, 0.10);
-  --line-2: rgba(255, 255, 255, 0.16);
-  --accent: #4a9eff;
-  --accent-bg: rgba(74, 158, 255, 0.14);
-  --accent-line: rgba(74, 158, 255, 0.38);
-  --accent-glow: rgba(74, 158, 255, 0.28);
-  --green: #34d399;
-  --green-bg: rgba(52, 211, 153, 0.12);
-  --amber: #fbbf24;
-  --amber-bg: rgba(251, 191, 36, 0.10);
-  --amber-line: rgba(251, 191, 36, 0.35);
-  --red: #f87171;
-  --focus: #4a9eff;
+:root, :root[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-sunk: #f9f9f8;
+  --bg-hover: rgba(55, 53, 47, 0.045);
+  --active: rgba(55, 53, 47, 0.075);
+  --card: #ffffff;
+  --text: #37352f;
+  --text-2: rgba(55, 53, 47, 0.68);
+  --text-3: rgba(55, 53, 47, 0.46);
+  --text-4: rgba(55, 53, 47, 0.28);
+  --line: rgba(55, 53, 47, 0.09);
+  --line-2: rgba(55, 53, 47, 0.16);
+  --accent: #2383e2;
+  --accent-bg: rgba(35, 131, 226, 0.08);
+  --accent-line: rgba(35, 131, 226, 0.35);
+  --accent-glow: transparent;
+  --green: #448361;
+  --green-bg: #edf3ec;
+  --amber: #cb912f;
+  --amber-bg: #fbf3db;
+  --amber-line: rgba(203, 145, 47, 0.35);
+  --red: #e03e3e;
+  --red-bg: #fdebec;
+  --focus: #2383e2;
   --radius: 10px;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --font: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-display: 'Cal Sans', 'Inter', -apple-system, sans-serif;
-  color-scheme: dark;
-}
-
-/* Primary buttons per theme: Synapse uses the site's tinted blue with a glow;
-   Light and Dark use solid ink. */
-:root {
-  --btn-bg: var(--accent-bg); --btn-fg: var(--accent); --btn-line: var(--accent-line);
-  --btn-glow: 0 0 18px rgba(74, 158, 255, 0.14); --btn-glow-hover: 0 0 0 1px rgba(74, 158, 255, 0.45), 0 0 28px var(--accent-glow);
-  --btn-bg-hover: rgba(74, 158, 255, 0.22);
-  --page-glow: radial-gradient(900px 420px at 78% -8%, rgba(74, 158, 255, 0.09), transparent 62%);
+  --font: 'Inter', ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-display: var(--font);
+  --pop: 0 0 0 1px rgba(15, 15, 15, 0.05), 0 3px 6px rgba(15, 15, 15, 0.08), 0 9px 24px rgba(15, 15, 15, 0.14);
+  --ink: #2f3437;
+  --ink-fg: #ffffff;
+  --btn-bg: #2383e2; --btn-fg: #ffffff; --btn-line: transparent; --btn-bg-hover: #0b6fd0;
+  --btn-glow: none; --btn-glow-hover: none;
+  --page-glow: none;
+  /* Notion colours for icons, tags and dots */
+  --ic-gray: #91918e; --ic-brown: #9f6b53; --ic-orange: #d9730d; --ic-yellow: #cb912f; --ic-green: #448361;
+  --ic-blue: #337ea9; --ic-purple: #9065b0; --ic-pink: #c14c8a; --ic-red: #d44c47;
+  color-scheme: light;
 }
 :root[data-theme="dark"] {
-  --bg: #1c1b19; --bg-sunk: #161513; --bg-hover: #2a2926; --card: #23221f;
-  --text: #ecebe6; --text-2: #b3afa6; --text-3: #7c786f;
-  --line: rgba(236, 235, 230, 0.09); --line-2: rgba(236, 235, 230, 0.17);
-  --accent: #7cc196; --accent-bg: #1f3327; --accent-line: rgba(124, 193, 150, 0.35); --accent-glow: transparent;
-  --green: #7cc196; --green-bg: #1f3327; --amber: #e8b866; --amber-bg: #33280f; --amber-line: #5c4619; --red: #e58a80; --focus: #7cc196;
-  --btn-bg: #ecebe6; --btn-fg: #1c1b19; --btn-line: transparent; --btn-glow: none; --btn-glow-hover: none; --btn-bg-hover: #ffffff;
+  --bg: #191919; --bg-sunk: #202020; --bg-hover: rgba(255, 255, 255, 0.05); --active: rgba(255, 255, 255, 0.085); --card: #252525;
+  --text: rgba(255, 255, 255, 0.86); --text-2: rgba(255, 255, 255, 0.6); --text-3: rgba(255, 255, 255, 0.42); --text-4: rgba(255, 255, 255, 0.24);
+  --line: rgba(255, 255, 255, 0.08); --line-2: rgba(255, 255, 255, 0.14);
+  --accent: #2383e2; --accent-bg: rgba(35, 131, 226, 0.16); --accent-line: rgba(35, 131, 226, 0.45); --accent-glow: transparent;
+  --green: #5ba37b; --green-bg: #213a2c; --amber: #ca984d; --amber-bg: #463720; --amber-line: rgba(202, 152, 77, 0.4);
+  --red: #e5675f; --red-bg: rgba(229, 103, 95, 0.13); --focus: #2383e2;
+  --pop: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 28px rgba(0, 0, 0, 0.5);
+  --ink: #ededed; --ink-fg: #191919;
+  --btn-bg: #2383e2; --btn-fg: #ffffff; --btn-line: transparent; --btn-bg-hover: #3a91e8; --btn-glow: none; --btn-glow-hover: none;
   --page-glow: none;
+  --ic-gray: #9b9b9b; --ic-brown: #ba856f; --ic-orange: #d0844f; --ic-yellow: #ca984d; --ic-green: #5ba37b;
+  --ic-blue: #5e9bd6; --ic-purple: #a77fd6; --ic-pink: #d56aa0; --ic-red: #e06560;
   color-scheme: dark;
 }
-:root[data-theme="light"] {
-  --bg: #fbfaf7; --bg-sunk: #f3f1ec; --bg-hover: #ece9e2; --card: #ffffff;
-  --text: #22211e; --text-2: #5f5c55; --text-3: #9a968c;
-  --line: rgba(34, 33, 30, 0.09); --line-2: rgba(34, 33, 30, 0.16);
-  --accent: #3c7a52; --accent-bg: #e7f1ea; --accent-line: rgba(60, 122, 82, 0.3); --accent-glow: transparent;
-  --green: #3c7a52; --green-bg: #e7f1ea; --amber: #8a5a12; --amber-bg: #fbf1de; --amber-line: #ecd3a3; --red: #a23b32; --focus: #3c7a52;
-  --btn-bg: #22211e; --btn-fg: #fbfaf7; --btn-line: transparent; --btn-glow: none; --btn-glow-hover: none; --btn-bg-hover: #000000;
-  --page-glow: none;
-  color-scheme: light;
+:root[data-theme="synapse"] {
+  --bg: #070b16; --bg-sunk: #0b1120; --bg-hover: rgba(122, 162, 255, 0.07); --active: rgba(122, 162, 255, 0.12); --card: #0f182b;
+  --text: rgba(255, 255, 255, 0.92); --text-2: rgba(255, 255, 255, 0.7); --text-3: rgba(255, 255, 255, 0.5); --text-4: rgba(255, 255, 255, 0.28);
+  --line: rgba(255, 255, 255, 0.08); --line-2: rgba(255, 255, 255, 0.14);
+  --accent: #4a9eff; --accent-bg: rgba(74, 158, 255, 0.14); --accent-line: rgba(74, 158, 255, 0.38); --accent-glow: rgba(74, 158, 255, 0.28);
+  --green: #34d399; --green-bg: rgba(52, 211, 153, 0.12); --amber: #fbbf24; --amber-bg: rgba(251, 191, 36, 0.10); --amber-line: rgba(251, 191, 36, 0.35);
+  --red: #f87171; --red-bg: rgba(248, 113, 113, 0.12); --focus: #4a9eff;
+  --pop: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 10px 32px rgba(0, 0, 0, 0.6);
+  --ink: #142038; --ink-fg: rgba(255, 255, 255, 0.92);
+  --btn-bg: rgba(74, 158, 255, 0.14); --btn-fg: #4a9eff; --btn-line: transparent; --btn-bg-hover: rgba(74, 158, 255, 0.22);
+  --btn-glow: inset 0 0 0 1px rgba(74, 158, 255, 0.38), 0 0 18px rgba(74, 158, 255, 0.14);
+  --btn-glow-hover: inset 0 0 0 1px rgba(74, 158, 255, 0.45), 0 0 28px rgba(74, 158, 255, 0.28);
+  --page-glow: radial-gradient(900px 420px at 78% -8%, rgba(74, 158, 255, 0.07), transparent 62%);
+  --ic-gray: #94a3b8; --ic-brown: #c9a08a; --ic-orange: #fb923c; --ic-yellow: #fbbf24; --ic-green: #34d399;
+  --ic-blue: #4a9eff; --ic-purple: #a78bfa; --ic-pink: #f472b6; --ic-red: #f87171;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; font-family: var(--font); color: var(--text); -webkit-font-smoothing: antialiased; }
-button { font: inherit; color: inherit; cursor: pointer; }
-input, textarea, select { font: inherit; color: inherit; }
+html, body { margin: 0; padding: 0; font-family: var(--font); color: var(--text); -webkit-font-smoothing: antialiased; font-feature-settings: 'cv11', 'ss01'; letter-spacing: -0.003em; }
+button { font: inherit; color: inherit; cursor: pointer; letter-spacing: inherit; }
+input, textarea, select { font: inherit; color: inherit; letter-spacing: inherit; }
+::selection { background: rgba(35, 131, 226, 0.22); }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }

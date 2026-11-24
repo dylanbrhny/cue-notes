@@ -216,7 +216,7 @@ async function teamSettingsPanels(s) {
       authState.user ? h('label', { class: 'toggle' },
         h('input', { type: 'checkbox', checked: !!s.notifyTeamCalls, onchange: (e) => call('settings:save', { notifyTeamCalls: e.target.checked }) }),
         h('span', { class: 'tx' }, h('b', {}, 'Tell me when a teammate starts a call'), h('span', {}, 'A notification with a link to watch it live.'))) : null,
-      authState.user ? h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'link-btn allow', onclick: () => playDemo() }, '▶ Watch the 90-second Cue demo')) : null));
+      authState.user ? h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'link-btn allow', onclick: () => playDemo() }, 'Watch the 90-second Cue demo')) : null));
   }
 
   // Calendar
@@ -578,7 +578,7 @@ async function devicesPanel() {
     h('p', { class: 'hint' }, 'Cue only opens on computers and browsers you approve. Removing one signs it out right away, including its Claude connector.'),
     pending.length ? h('div', { class: 'banner warn', style: 'margin-bottom:10px' }, `${pending.length} waiting for your approval`) : null,
     h('ul', { class: 'members devices' }, list.map((d) => h('li', { class: d.status },
-      h('span', { class: 'avatar' }, d.platform === 'Web' ? '🌐' : d.platform === 'Mac' ? '⌘' : '⊞'),
+      h('span', { class: 'avatar', title: d.platform, html: d.platform === 'Web' ? ICON.globe : ICON.laptop }),
       h('span', { class: 'grow' },
         h('b', { title: 'Click to rename', style: 'cursor:text', onclick: async () => { const n = prompt('Name for this computer', d.name); if (n && n.trim() && n !== d.name) { await call('computers:rename', { id: d.id, name: n.trim() }); renderView(); } } }, d.name),
         h('span', {}, ` ${d.owner}${d.thisDevice ? ' · this computer' : ''} · seen ${ago(d.lastSeen)}`)),
@@ -663,7 +663,6 @@ let addingSpace = false;
 let renamingFolder = null;    // folder id being renamed inline
 let renamingSpace = null;
 let menuFor = null;           // 'f:<id>' or 's:<id>' whose ⋯ menu is open
-let pickerFor = null;         // 'f:<id>' or 's:<id>' whose icon picker is open
 let dragging = null;          // {kind: 'folder'|'call', id}
 const collapsed = new Set((() => { try { return JSON.parse(localStorage.getItem('cue-folders-collapsed') || '[]'); } catch { return []; } })());
 const saveCollapsed = () => { try { localStorage.setItem('cue-folders-collapsed', JSON.stringify([...collapsed])); } catch {} };
@@ -674,19 +673,16 @@ const folderPath = (id) => { const parts = []; let f = foldersCache.find((x) => 
 const spaceOf = (f) => (f.private ? 'mine' : f.spaceId && spacesCache.some((s) => s.id === f.spaceId) ? f.spaceId : 'team');
 const topFolders = (space) => foldersCache.filter((f) => spaceOf(f) === space && (!f.parentId || !foldersCache.some((p) => p.id === f.parentId)));
 
-function folderIcon(f, size = 15) {
-  if (f.icon) return h('span', { class: 'f-emoji', style: `font-size:${size - 2}px;width:${size}px` }, f.icon);
-  return h('span', { class: 'folder-ico', html: ICON.folder });
+function folderIcon(f, size = 16) {
+  return cueIcon(f.icon, size) || h('span', { class: 'folder-ico', html: ICON.folder });
 }
 
-const EMOJI = ['📁', '📂', '🗂️', '⭐', '🔥', '🎯', '💰', '📈', '📊', '🤝', '📞', '☎️', '💬', '🧠', '💡', '🛠️', '🏭', '⚙️', '🔩', '🚚', '🏗️', '🧪', '🔒', '👤', '👥', '🧑‍💼', '🎓', '📚', '📝', '✅', '🗓️', '⏳', '🚀', '🏆', '❤️', '🟢', '🟡', '🔴', '🔵', '🟣', '⚫', '🌱', '🧭', '🎙️', '📣', '💼', '🏢', '🇺🇸', '🧾', '🤖'];
-
-function iconPicker(onPick) {
-  const custom = h('input', { class: 'input', placeholder: 'Or paste any emoji', maxlength: '8', onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); pick(custom.value.trim()); } } });
-  const pick = async (icon) => { pickerFor = null; await onPick(icon); renderFolders(); };
-  return h('div', { class: 'pop picker', onclick: (e) => e.stopPropagation() },
-    h('div', { class: 'emoji-grid' }, EMOJI.map((e) => h('button', { class: 'emoji', type: 'button', onclick: () => pick(e) }, e))),
-    h('div', { class: 'row', style: 'margin-top:8px;flex-wrap:nowrap' }, custom, h('button', { class: 'btn', type: 'button', onclick: () => pick('') }, 'Remove')));
+// Notion-style icon picker (icon-picker.js), anchored to the clicked icon.
+const saveFolderIcon = (f) => (icon) => call('folders:update', { id: f.id, patch: { icon } }).then(() => { renderFolders(); if (route.view === 'folder' && route.id === f.id) renderFolder(f.id); });
+const saveSpaceIcon = (sp) => (icon) => call('spaces:update', { id: sp.id, patch: { icon } }).then(() => { renderFolders(); if (route.view === 'space' && route.id === sp.id) renderSpace(sp.id); });
+function pickIconFor(key, value, save) {
+  const anchor = document.querySelector(`[data-icon-for="${key}"]`);
+  if (anchor) openIconPicker(anchor, { value, onPick: save });
 }
 
 const menuItem = (label, fn, danger) => h('button', { class: danger ? 'danger' : '', type: 'button', onclick: (e) => { e.stopPropagation(); menuFor = null; fn(); } }, label);
@@ -694,7 +690,7 @@ const menuItem = (label, fn, danger) => h('button', { class: danger ? 'danger' :
 function folderMenu(f) {
   return h('div', { class: 'pop menu-pop', onclick: (e) => e.stopPropagation() },
     menuItem('Rename', () => { renamingFolder = f.id; renderFolders(); }),
-    menuItem('Change icon', () => { pickerFor = `f:${f.id}`; renderFolders(); }),
+    menuItem('Change icon', () => { pickIconFor(`f:${f.id}`, f.icon, saveFolderIcon(f)); renderFolders(); }),
     menuItem('New folder inside', () => { addingFolder = { parent: f.id, space: spaceOf(f) }; collapsed.delete(f.id); saveCollapsed(); renderFolders(); }),
     f.parentId ? menuItem('Move out of its folder', async () => { const r = await call('folders:update', { id: f.id, patch: { parentId: null } }); if (!r.ok) alert(r.error); renderFolders(); }) : null,
     spaceOf(f) !== 'mine' ? menuItem('Move to My notes (private)', async () => { const r = await call('folders:toSpace', { id: f.id, target: 'mine' }); if (!r.ok) alert(r.error); renderFolders(); }) : null,
@@ -711,7 +707,7 @@ function spaceMenu(sp) {
   return h('div', { class: 'pop menu-pop', onclick: (e) => e.stopPropagation() },
     menuItem('New folder', () => { addingFolder = { parent: null, space: sp.id }; collapsed.delete(`s:${sp.id}`); saveCollapsed(); renderFolders(); }),
     custom ? menuItem('Rename', () => { renamingSpace = sp.id; renderFolders(); }) : null,
-    custom ? menuItem('Change icon', () => { pickerFor = `s:${sp.id}`; renderFolders(); }) : null,
+    custom ? menuItem('Change icon', () => { pickIconFor(`s:${sp.id}`, sp.icon, saveSpaceIcon(sp)); renderFolders(); }) : null,
     custom ? menuItem('Delete space', async () => {
       if (!confirm(`Delete the space "${sp.name}"? Its folders move to Team.`)) return;
       await call('spaces:delete', sp.id); if (route.view === 'space' && route.id === sp.id) go({ view: 'home' }); else renderFolders();
@@ -794,15 +790,14 @@ function folderRow(f, depth) {
   const row = h('div', { class: `folder-row ${on ? 'on' : ''}`, style: `padding-left:${4 + depth * 14}px`, onclick: () => go({ view: 'folder', id: f.id }),
     ondblclick: (e) => { e.stopPropagation(); renamingFolder = f.id; renderFolders(); } },
     chevron,
-    h('button', { class: 'icon-btn-f', type: 'button', title: 'Change icon', onclick: (e) => { e.stopPropagation(); pickerFor = pickerFor === `f:${f.id}` ? null : `f:${f.id}`; menuFor = null; renderFolders(); } }, folderIcon(f)),
+    h('button', { class: 'icon-btn-f', type: 'button', title: 'Change icon', 'data-icon-for': `f:${f.id}`, onclick: (e) => { e.stopPropagation(); if (menuFor) { menuFor = null; renderFolders(); } openIconPicker(e.currentTarget, { value: f.icon, onPick: saveFolderIcon(f) }); } }, folderIcon(f)),
     label,
     f.count ? h('span', { class: 'n' }, f.count) : null,
-    h('button', { class: 'dots', type: 'button', title: 'More', 'aria-label': `More for ${f.name}`, html: ICON.dots, onclick: (e) => { e.stopPropagation(); menuFor = menuFor === `f:${f.id}` ? null : `f:${f.id}`; pickerFor = null; renderFolders(); } }));
+    h('button', { class: 'dots', type: 'button', title: 'More', 'aria-label': `More for ${f.name}`, html: ICON.dots, onclick: (e) => { e.stopPropagation(); closeIconPicker(); menuFor = menuFor === `f:${f.id}` ? null : `f:${f.id}`; renderFolders(); } }));
   if (renamingFolder !== f.id) makeDraggable(row, 'folder', f.id);
   dropZone(row, () => dropOnFolder(f.id), (d) => !(d.kind === 'folder' && (d.id === f.id || descendants(d.id).includes(f.id))));
   const out = [h('div', { class: 'folder-wrap' }, row,
-    menuFor === `f:${f.id}` ? folderMenu(f) : null,
-    pickerFor === `f:${f.id}` ? iconPicker((icon) => call('folders:update', { id: f.id, patch: { icon } }).then(() => { if (route.view === 'folder' && route.id === f.id) renderFolder(f.id); })) : null)];
+    menuFor === `f:${f.id}` ? folderMenu(f) : null,)];
   if (open) for (const c of children) out.push(...folderRow(c, depth + 1));
   if (addingFolder && addingFolder.parent === f.id) out.push(newFolderInput(addingFolder, depth + 1));
   return out;
@@ -830,9 +825,9 @@ function spaceRow(sp) {
   const on = route.view === 'space' && route.id === sp.id;
   const icon = sp.id === 'mine' ? h('span', { class: 'space-ico lock-ico', html: ICON.lock })
     : sp.id === 'team' ? h('img', { class: 'space-ico', src: 'assets/logo.svg', alt: '' })
-    : sp.id === 'clients' ? h('span', { class: 'f-emoji', style: 'font-size:13px;width:15px' }, '🤝')
-    : h('button', { class: 'icon-btn-f', type: 'button', title: 'Change icon', onclick: (e) => { e.stopPropagation(); pickerFor = pickerFor === key ? null : key; menuFor = null; renderFolders(); } },
-      sp.icon ? h('span', { class: 'f-emoji', style: 'font-size:13px;width:15px' }, sp.icon) : h('span', { class: 'space-letter' }, (sp.name || '?')[0].toUpperCase()));
+    : sp.id === 'clients' ? cueIcon('handshake', 16)
+    : h('button', { class: 'icon-btn-f', type: 'button', title: 'Change icon', 'data-icon-for': key, onclick: (e) => { e.stopPropagation(); if (menuFor) { menuFor = null; renderFolders(); } openIconPicker(e.currentTarget, { value: sp.icon, onPick: saveSpaceIcon(sp) }); } },
+      cueIcon(sp.icon, 16) || h('span', { class: 'space-letter' }, (sp.name || '?')[0].toUpperCase()));
   const label = renamingSpace === sp.id
     ? inlineRename(sp.name, async (v) => { renamingSpace = null; if (v && v !== sp.name) await call('spaces:update', { id: sp.id, patch: { name: v } }); renderFolders(); })
     : h('span', { class: 'grow' }, sp.name);
@@ -841,11 +836,10 @@ function spaceRow(sp) {
       ? h('button', { class: `chev ${open ? 'open' : ''}`, type: 'button', 'aria-label': open ? 'Collapse' : 'Expand', html: ICON.chev, onclick: (e) => { e.stopPropagation(); open ? collapsed.add(key) : collapsed.delete(key); saveCollapsed(); renderFolders(); } })
       : h('span', { class: 'chev-space' }),
     icon, label,
-    sp.id === 'clients' ? null : h('button', { class: 'dots', type: 'button', title: 'More', 'aria-label': `More for ${sp.name}`, html: ICON.dots, onclick: (e) => { e.stopPropagation(); menuFor = menuFor === key ? null : key; pickerFor = null; renderFolders(); } }));
+    sp.id === 'clients' ? null : h('button', { class: 'dots', type: 'button', title: 'More', 'aria-label': `More for ${sp.name}`, html: ICON.dots, onclick: (e) => { e.stopPropagation(); closeIconPicker(); menuFor = menuFor === key ? null : key; renderFolders(); } }));
   if (sp.id !== 'clients') dropZone(row, () => dropOnSpace(sp.id), (d) => d.kind === 'folder' || sp.id === 'mine' || sp.id === 'team');
   const out = [h('div', { class: 'folder-wrap' }, row,
-    menuFor === key ? spaceMenu(sp) : null,
-    pickerFor === key ? iconPicker((icon) => call('spaces:update', { id: sp.id, patch: { icon } })) : null)];
+    menuFor === key ? spaceMenu(sp) : null,)];
   if (open) {
     for (const f of folders) out.push(...folderRow(f, 1));
     if (addingFolder && addingFolder.space === sp.id && !addingFolder.parent) out.push(newFolderInput(addingFolder, 1));
@@ -858,7 +852,7 @@ async function renderFolders() {
   if (!el) return;
   if (!authState.user || isClientUser()) { el.replaceChildren(); foldersCache = []; spacesCache = []; return; }
   [foldersCache, spacesCache] = await Promise.all([call('folders:list'), call('spaces:list')]);
-  const spaces = [{ id: 'mine', name: 'My notes' }, { id: 'team', name: 'Team' }, ...spacesCache, { id: 'clients', name: 'Clients', icon: '🤝' }];
+  const spaces = [{ id: 'mine', name: 'My notes' }, { id: 'team', name: 'Team' }, ...spacesCache, { id: 'clients', name: 'Clients', icon: 'handshake' }];
   const newSpace = addingSpace ? h('form', { class: 'folder-add', style: 'padding-left:22px', onsubmit: async (e) => {
     e.preventDefault();
     const v = e.target.querySelector('input').value.trim();
@@ -875,7 +869,7 @@ async function renderFolders() {
     binRow('archive', 'Archive', 'archive'), binRow('trash', 'Deleted', 'trash'));
   if (newSpace) setTimeout(() => newSpace.querySelector('input').focus(), 10);
 }
-document.addEventListener('click', () => { if (menuFor || pickerFor) { menuFor = null; pickerFor = null; renderFolders(); } });
+document.addEventListener('click', () => { if (menuFor) { menuFor = null; renderFolders(); } });
 
 // ---- What wins -------------------------------------------------------------------------
 // Won sales calls next to lost ones, per preset: which beats, objections and habits
@@ -999,7 +993,7 @@ async function renderFolder(id) {
   const parentOpts = foldersCache.filter((x) => !blocked.has(x.id)).map((x) => h('option', { value: x.id, selected: x.id === f.parentId }, folderPath(x.id)));
   await loadCompanyNames();
   const out = callRows(meetings);
-  const iconBtn = h('button', { class: 'big-icon', type: 'button', title: 'Change icon', onclick: (e) => { e.stopPropagation(); pickerFor = `f:${f.id}`; renderFolders(); document.getElementById('main').scrollTop = 0; } }, f.icon || h('span', { class: 'folder-ico big', html: ICON.folder }));
+  const iconBtn = h('button', { class: 'big-icon', type: 'button', title: 'Change icon', onclick: (e) => { e.stopPropagation(); openIconPicker(e.currentTarget, { value: f.icon, onPick: saveFolderIcon(f) }); } }, cueIcon(f.icon, 30) || h('span', { class: 'folder-ico big', html: ICON.folder }));
   $view.replaceChildren(
     h('div', { class: 'folder-head' }, iconBtn,
       h('input', { class: 'title-input', value: f.name, placeholder: 'Folder name', oninput: (e) => saveName(e.target.value) })),
@@ -1026,7 +1020,7 @@ async function renderFolder(id) {
 function folderPicker(c) {
   if (!authState.user || !foldersCache.length) return null;
   const opts = foldersCache.slice().sort((a, b) => folderPath(a.id).localeCompare(folderPath(b.id)))
-    .map((f) => h('option', { value: f.id, selected: f.id === c.folderId }, `${f.icon ? `${f.icon} ` : ''}${folderPath(f.id)}${f.private ? ' (private)' : ''}`));
+    .map((f) => h('option', { value: f.id, selected: f.id === c.folderId }, `${folderPath(f.id)}${f.private ? ' (private)' : ''}`));
   return h('select', { class: 'chip-select', title: 'Move to folder', onchange: async (e) => {
     const r = await call('calls:move', { id: c.id, folderId: e.target.value || null });
     if (!r.ok) alert(r.error);
