@@ -26,6 +26,10 @@ let templatesCache = null;
 let authState = { configured: false, user: null };
 
 let teamLive = []; // calls live on the team right now (team.js keeps it fresh)
+// Our side of a call: Synapse addresses plus everyone on the team list (any domain).
+let TEAM_EMAILS = new Set();
+const isOurs = (e) => /@synapsemfg\.com$/i.test(e || '') || TEAM_EMAILS.has(String(e || '').toLowerCase());
+const loadTeamEmails = () => call('team:emails').then((l) => { if (Array.isArray(l) && l.length) TEAM_EMAILS = new Set(l); }).catch(() => {});
 const ICON = {
   check: '<svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2l2.3 2.3 4.7-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   calls: '<svg viewBox="0 0 16 16" fill="none"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5" stroke="currentColor" stroke-width="1.4"/><path d="M5 6h6M5 8.5h6M5 11h3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
@@ -413,7 +417,7 @@ async function renderCall(id) {
   document.addEventListener('click', () => { if (menuOpenHere) { menuOpenHere = false; drawMenu(); } }, { once: true });
 
   // Who was on it, in one quiet line.
-  const others = (c.attendees || []).filter((a) => !/@synapsemfg\.com$/i.test(a.email || '')).map((a) => a.name || (a.email || '').split('@')[0]).filter(Boolean);
+  const others = (c.attendees || []).filter((a) => !isOurs(a.email)).map((a) => a.name || (a.email || '').split('@')[0]).filter(Boolean);
   let showBeats = false;
   const beatsBox = h('div');
   const drawBeats = () => beatsBox.replaceChildren(...(showBeats ? [h('div', { class: 'beats' },
@@ -796,7 +800,7 @@ let routedByMain = false;
 window.cue.on('route', (r) => { routedByMain = true; go(r); });
 window.cue.on('calls:changed', () => { renderList(); if (route.view === 'call') renderCall(route.id); if (route.view === 'home') renderHome(); });
 window.cue.on('team:changed', () => { renderList(); renderTeamLive(); });
-window.cue.on('auth:changed', async () => { authState = await call('auth:state'); renderAccount(); renderNav(); renderTeamLive(); renderFolders(); presetsChanged(); renderView(); });
+window.cue.on('auth:changed', async () => { authState = await call('auth:state'); loadTeamEmails(); renderAccount(); renderNav(); renderTeamLive(); renderFolders(); presetsChanged(); renderView(); });
 window.cue.on('computers:changed', () => { if (route.view === 'settings' || route.view === 'admin') renderView(); });
 window.cue.on('monitor:event', (e) => onMonitorEvent(e));
 window.cue.on('settings:changed', (s) => { applyTheme(s.theme); if (route.view === 'settings') renderSettings(); });
@@ -838,6 +842,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   call('settings:get').then((s) => applyTheme(s.theme));
   info = await call('app:info');
   authState = await call('auth:state');
+  loadTeamEmails();
   renderAccount();
   renderTeamLive();
   renderFolders();
