@@ -296,7 +296,7 @@ async function teamSettingsPanels(s) {
 async function renderAdmin() {
   if (authState.user?.role !== 'admin') return go({ view: 'settings' });
   const panels = [];
-  panels.push(await simulatorPanel(), await devicesPanel(), await contextPanel(), await adminPanel());
+  panels.push(await simulatorPanel(), await devicesPanel(), await guidePanel(), await contextPanel(), await adminPanel());
 
   // Who we are + how we sell
   const ws = await call('workspace:get');
@@ -479,6 +479,21 @@ async function contextPanel() {
         : h('button', { class: 'btn', onclick: () => { slackBox.hidden = !slackBox.hidden; } }, 'Connect Slack')),
     slackBox,
     row('Google Drive', st.drive ? !s.drive?.error : false, st.drive ? line('drive') : 'Google Drive for desktop isn’t mirroring “Client Data Exports” on this Mac.'),
+    out);
+}
+
+// Admin → Install guide: who can open cue.synapsemfg.com/download.
+async function guidePanel() {
+  const st = await call('guide:code');
+  const out = h('div', { class: 'test-out' });
+  const input = h('input', { type: 'text', class: 'input', placeholder: st.set ? 'A code is set. Type a new one to change it' : 'e.g. synapse-clients-2026', autocomplete: 'off', style: 'flex:1' });
+  return h('div', { class: 'panel' }, h('h3', {}, 'Install guide'),
+    h('div', { class: 'hint', style: 'margin-bottom:10px' }, 'cue.synapsemfg.com/download has the downloads and a step-by-step install guide (including the “Open Anyway” / “Run anyway” warnings). The team opens it with their work email and the team PIN. Clients open it with this code; it only opens the guide, not Cue itself.'),
+    h('div', { class: 'row', style: 'gap:8px;margin-bottom:8px' }, input,
+      h('button', { class: 'btn primary', onclick: async () => { if (!input.value.trim()) return; const r = await call('guide:code', input.value.trim()); out.textContent = r.ok ? `Saved. Clients use: ${input.value.trim()}` : r.error; if (r.ok) input.value = ''; } }, 'Save code'),
+      st.set ? h('button', { class: 'link-btn danger', onclick: async () => { if (!confirm('Turn off client access to the install guide?')) return; const r = await call('guide:code', ''); out.textContent = r.ok ? 'Client access turned off.' : r.error; } }, 'Turn off') : null),
+    h('div', { class: 'row', style: 'gap:8px' }, h('span', { class: 'grow', style: 'font-size:12.5px;color:var(--text-3)' }, st.set ? 'Client access is on.' : 'No client code yet: only the team can open it.'),
+      h('button', { class: 'link-btn', onclick: () => { navigator.clipboard.writeText('https://cue.synapsemfg.com/download'); out.textContent = 'Link copied.'; } }, 'Copy link')),
     out);
 }
 
