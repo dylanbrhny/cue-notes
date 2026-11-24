@@ -226,6 +226,8 @@ function renderWaiting() {
 
 async function renderView() {
   const v = route.view;
+  // The saved sign-in is still loading: don't flash the sign-in page.
+  if (authState.restoring && v !== 'signin') { $view.replaceChildren(h('div', { class: 'placeholder' }, h('span', { class: 'spin' }), 'Opening Cue…')); return; }
   if (deviceBlocked() && v !== 'signin') return renderWaiting();
   if ($view.dataset.view !== v || $view.dataset.id !== String(route.id || '')) { $view.classList.remove('enter'); void $view.offsetWidth; $view.classList.add('enter'); }
   $view.dataset.view = v;
