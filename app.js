@@ -118,7 +118,7 @@ async function renderStart() {
   if (key === startKey) return;
   startKey = key;
   if (isLive) {
-    $start.replaceChildren(h('button', { class: 'start-btn live', onclick: () => go({ view: 'live' }) }, h('span', { class: 'mark' }), 'On a call · ', liveState.snapshot.done, '/', liveState.snapshot.total));
+    $start.replaceChildren(h('button', { class: 'start-btn live', onclick: () => go({ view: 'live' }) }, h('span', { class: 'mark' }), liveState.snapshot.total ? `On a call · ${liveState.snapshot.done}/${liveState.snapshot.total}` : 'On a call'));
     return;
   }
   const presets = presetsCache || (presetsCache = await call('presets:get'));
@@ -322,7 +322,7 @@ function renderLive(full) {
       h('div', { class: 'section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Your notes')), liveNotesEl),
       h('div', { class: 'section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Live notes'), h('span', { class: 'saved', id: 'live-people' })),
         h('div', { class: 'md live-notes', id: 'live-ai-notes' }, h('div', { class: 'placeholder' }, 'Cue writes these as the call goes, every couple of minutes.'))),
-      h('div', { class: 'section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Checklist')), h('ul', { class: 'checks', id: 'live-checks' })),
+      h('div', { class: 'section', style: s.total ? '' : 'display:none' }, h('div', { class: 'section-head' }, h('h2', {}, 'Checklist')), h('ul', { class: 'checks', id: 'live-checks' })),   // note-taking calls have no checklist
       h('div', { class: 'section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Live transcript')), h('div', { class: 'lines', id: 'live-lines' })),
     );
     liveBuilt = true;
@@ -346,7 +346,7 @@ function renderLive(full) {
   const checksEl = document.getElementById('live-checks');
   if (checksEl.dataset.key !== checksKey) {
     checksEl.dataset.key = checksKey;
-    document.getElementById('live-coverage').replaceChildren(coverage(s.done, s.total));
+    document.getElementById('live-coverage').replaceChildren(...(s.total ? [coverage(s.done, s.total)] : []));
     checksEl.replaceChildren(...s.items.map((i) => checkRow(i, true)));
   }
   const lines = document.getElementById('live-lines');

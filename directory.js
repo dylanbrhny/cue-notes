@@ -113,7 +113,7 @@ function demoCard() {
   const hide = (e) => { e?.stopPropagation(); try { localStorage.setItem('cue-demo-hidden', '1'); } catch {} card.remove(); };
   const card = h('div', { class: 'demo-card', role: 'button', tabindex: '0', onclick: () => playDemo(), onkeydown: (e) => { if (e.key === 'Enter') playDemo(); } },
     h('span', { class: 'demo-thumb' }, h('img', { src: 'assets/demo-poster.jpg', alt: '' }), h('span', { class: 'demo-play' })),
-    h('span', { class: 'grow' }, h('b', {}, 'Watch how Cue works'), h('span', {}, '90 seconds: the live coach, notes, the Live tab, sharing and more.')),
+    h('span', { class: 'grow' }, h('b', {}, 'Watch how Cue works'), h('span', {}, 'A minute and a half: the live coach, notes, the Live tab, What wins and more.')),
     h('button', { class: 'link-btn', onclick: hide }, 'Hide'));
   return card;
 }

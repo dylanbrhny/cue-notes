@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZFIqtko39YINg77Ur1QP8tCVcgLUf5mDuVT/zAnFicg='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://vnukfvbmimakiotsanjv.supabase.co; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-B2D21ozofP35Cwki4XSqkvdEPAMTGj22yn7NpMws4/I='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; media-src 'self'; connect-src https://vnukfvbmimakiotsanjv.supabase.co; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <meta name="theme-color" content="#070b16">
@@ -28,17 +28,17 @@ button{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
-/* motion switch (same idea as the main site) */
-html[data-motion="off"] *,html[data-motion="off"] *::before,html[data-motion="off"] *::after{animation:none!important;transition:none!important}
-html[data-motion="off"]{scroll-behavior:auto}
-html[data-motion="off"] [data-rv]{opacity:1!important;transform:none!important;filter:none!important}
-.motion-btn{position:fixed;left:16px;bottom:16px;z-index:1500;display:inline-flex;align-items:center;gap:9px;min-height:40px;padding:0 15px 0 13px;border-radius:999px;border:1px solid var(--line-3);background:rgba(7,11,22,.94);color:var(--text);font:600 12.5px/1 'Inter',sans-serif;cursor:pointer}
-.motion-btn:hover{border-color:var(--accent)}
-.motion-btn svg{width:12px;height:12px;fill:currentColor;flex:none}
-.motion-btn[data-state="on"] .i-play,.motion-btn[data-state="off"] .i-pause{display:none}
+/* people who ask for less motion get none */
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* the video */
+.film{position:relative;max-width:1000px;margin:44px auto 0;padding:0 20px}
+.film::before{content:"";position:absolute;inset:-40px 0 auto;height:240px;background:radial-gradient(closest-side,rgba(74,158,255,.24),transparent);filter:blur(12px);z-index:0}
+.film video{position:relative;z-index:1;display:block;width:100%;height:auto;aspect-ratio:16/9;background:#070b16;border:1px solid rgba(74,158,255,.45);border-radius:14px;box-shadow:0 0 0 1px rgba(74,158,255,.12),0 30px 80px rgba(0,0,0,.55)}
+.film+.hero-in{margin-top:28px}
+.film-note{position:relative;z-index:1;margin:14px auto 0;text-align:center;color:var(--text-2);font-size:13.5px}
 
 /* nav */
-#progress{position:fixed;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),#7cc0ff);transform-origin:0 50%;transform:scaleX(0);z-index:200}
 .nav{position:fixed;top:0;left:0;right:0;z-index:100;height:64px;padding:0 48px;display:flex;align-items:center;gap:22px;background:rgba(7,11,22,.82);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border-bottom:1px solid var(--line)}
 .nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none;flex:1}
 .nav-logo img{width:32px;height:32px;border-radius:8px;display:block}
@@ -82,54 +82,6 @@ html[data-motion="off"] [data-rv]{opacity:1!important;transform:none!important;f
 .hero-sub{max-width:620px;margin:0 auto 32px;color:var(--text-2);font-size:17px;line-height:1.65}
 .hero-cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
 .hero-note{margin:16px auto 0;color:var(--text-2);font-size:14.5px}
-.pill,.hero h1 .ln,.hero-sub,.hero-cta,.hero-note,.shot{animation:heroIn .9s var(--ease) both}
-.hero h1 .ln{animation-delay:.12s}
-.hero h1 .ln+.ln{animation-delay:.26s}
-.hero-sub{animation-delay:.4s}
-.hero-cta{animation-delay:.52s}
-.hero-note{animation-delay:.6s}
-.shot{animation-delay:.66s}
-@keyframes heroIn{from{opacity:0;transform:translateY(26px);filter:blur(10px)}to{opacity:1;transform:none;filter:none}}
-
-/* the product shot: a drawing of Cue during and after a call */
-.shot{position:relative;max-width:900px;margin:52px auto 0;text-align:left}
-.shot::before{content:"";position:absolute;inset:-46px -70px auto;height:240px;background:radial-gradient(closest-side,rgba(74,158,255,.26),transparent);filter:blur(12px);z-index:0;animation:shotGlow 5s ease-in-out infinite}
-@keyframes shotGlow{0%,100%{opacity:.65}50%{opacity:1}}
-.win{position:relative;z-index:1;background:var(--card);border:1px solid rgba(74,158,255,.45);border-radius:14px;overflow:hidden;box-shadow:0 0 0 1px rgba(74,158,255,.12),0 30px 80px rgba(0,0,0,.55)}
-.win-bar{display:flex;align-items:center;gap:7px;padding:12px 16px;background:var(--bg-2);border-bottom:1px solid var(--line);font-size:12px;font-weight:600;color:var(--text-2)}
-.win-bar i{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.16);flex:none}
-.win-t{margin-left:8px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rec{margin-left:auto;display:inline-flex;align-items:center;gap:8px;color:var(--text);white-space:nowrap;font-variant-numeric:tabular-nums}
-.live-dot{flex:none;width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(52,211,153,.5);animation:pulse 2s infinite}
-@keyframes pulse{70%{box-shadow:0 0 0 9px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
-.rec.off .live-dot{background:rgba(255,255,255,.4);animation:none}
-.win-body{display:grid;grid-template-columns:1.05fr .95fr}
-.pane{padding:18px 20px 20px;min-width:0}
-.pane+.pane{border-left:1px solid var(--line);background:rgba(255,255,255,.018)}
-.pane-h{display:flex;align-items:center;gap:10px;min-height:24px;font:500 11px/1 'Inter',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:12px}
-.chip{margin-left:auto;font:600 10.5px/1 'Inter',sans-serif;letter-spacing:0;text-transform:none;padding:5px 9px;border-radius:999px;border:1px solid var(--line-2);color:var(--text-2);white-space:nowrap;transition:color .35s,border-color .35s,background .35s}
-.chip.busy{color:var(--accent-2);border-color:rgba(74,158,255,.4);background:var(--accent-dim)}
-.chip.ok{color:var(--green);border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.08)}
-.tl{display:grid;grid-template-columns:48px minmax(0,1fr);gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px;line-height:1.5}
-.tl:last-child{border-bottom:0}
-.tl b{font-weight:600;font-size:12px;color:var(--accent-2);padding-top:1px}
-.tl.them b{color:var(--green)}
-.nb{margin-bottom:12px}
-.nb:last-child{margin-bottom:0}
-.nb h4{font:400 15px/1.2 var(--head);margin-bottom:5px}
-.nb p,.nb li{font-size:13px;line-height:1.5;color:var(--text-2)}
-.nb ul{list-style:none;display:grid;gap:3px}
-.nb li{position:relative;padding-left:14px}
-.nb li::before{content:"";position:absolute;left:0;top:.55em;width:5px;height:5px;border-radius:50%;background:var(--accent)}
-.nb li b{color:var(--text);font-weight:600}
-.shot.anim .tl,.shot.anim .nb{opacity:0;transform:translateY(8px);transition:opacity .5s ease,transform .5s var(--ease)}
-.shot.anim .tl.in,.shot.anim .nb.in{opacity:1;transform:none}
-
-.works{position:relative;max-width:1000px;margin:52px auto 0;text-align:center}
-.works .lbl{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#a3a7b7;margin-bottom:16px}
-.works ul{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;list-style:none}
-.works li{font-size:13px;font-weight:500;color:var(--text);border:1px solid var(--line-2);border-radius:999px;padding:7px 14px;background:rgba(255,255,255,.03)}
-.works li.any{color:var(--text-2);border-style:dashed}
 
 /* sections */
 .sec{max-width:1100px;margin:0 auto;padding:96px 24px}
@@ -138,96 +90,9 @@ html[data-motion="off"] [data-rv]{opacity:1!important;transform:none!important;f
 .sec-h{font:400 clamp(28px,3.6vw,44px)/1.15 var(--head);text-align:center;max-width:860px;margin:0 auto 48px}
 .sec-h+.sec-sub{margin-top:-32px}
 .sec-sub{text-align:center;color:var(--text-2);max-width:680px;margin:0 auto 48px;line-height:1.6}
-html.rv [data-rv]{opacity:0;transform:translateY(24px);filter:blur(8px);transition:opacity .8s ease,transform .8s var(--ease),filter .8s ease,border-color .3s,box-shadow .3s;transition-delay:calc(var(--i,0)*90ms)}
-html.rv [data-rv].in{opacity:1;transform:none;filter:none}
-
-/* features: bento */
-.bento{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.bc{position:relative;background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
-.bc:hover{border-color:rgba(74,158,255,.4)}
-.bc.tall{grid-row:span 2}
-.bc-vis{position:relative;flex:1;min-height:236px;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:28px 24px;background:radial-gradient(460px 240px at 50% 0%,rgba(74,158,255,.11),transparent 70%)}
-.bc.tall .bc-vis{min-height:420px}
-.bc-txt{padding:22px 24px 24px;border-top:1px solid var(--line)}
-.bc-txt h3{font:400 20px/1.2 var(--head);margin-bottom:8px}
-.bc-txt p{color:var(--text-2);font-size:14.5px;line-height:1.65}
-
-/* card 1: a meeting window with Cue's "Take notes?" card on top */
-.v-stack{width:100%;max-width:420px;display:grid;justify-items:center;gap:14px}
-.v-call{position:relative;width:100%;margin-bottom:30px}
-.v-arrow{color:var(--accent);font-size:20px;line-height:1;opacity:.85}
-.v-pill{display:inline-flex;align-items:center;gap:10px;padding:10px 16px;border-radius:999px;background:#101a30;border:1px solid var(--line-2);font-size:13px;box-shadow:0 12px 30px rgba(0,0,0,.45)}
-.v-pill b{font-weight:600}
-.v-pill>span{color:var(--text-2);font-variant-numeric:tabular-nums}
-.v-wave{display:inline-flex;align-items:center;gap:3px;height:16px}
-.v-wave i{width:3px;height:6px;border-radius:2px;background:var(--green);animation:wave 1.1s ease-in-out infinite}
-.v-wave i:nth-child(2){animation-delay:.15s}.v-wave i:nth-child(3){animation-delay:.3s}.v-wave i:nth-child(4){animation-delay:.45s}.v-wave i:nth-child(5){animation-delay:.6s}
-html[data-motion="off"] .v-wave i:nth-child(odd){height:12px}
-@keyframes wave{50%{height:16px}}
-.v-meet{border:1px solid var(--line-2);border-radius:12px;background:var(--bg-2);overflow:hidden}
-.v-meet-bar{display:flex;align-items:center;gap:6px;padding:9px 12px;border-bottom:1px solid var(--line);font-size:11px;font-weight:600;color:var(--text-3)}
-.v-meet-bar i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.16)}
-.v-meet-bar span{margin-left:6px}
-.v-tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 10px 74px}
-.v-tile{aspect-ratio:5/4;border-radius:8px;background:linear-gradient(160deg,#16233f,#0d1528);display:grid;place-items:center;position:relative}
-.v-tile i{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font:600 14px/1 'Inter',sans-serif;font-style:normal;color:#061020;background:linear-gradient(140deg,#9fd0ff,#4a9eff)}
-.v-tile:nth-child(2) i{background:linear-gradient(140deg,#8ff0c6,#34d399)}
-.v-tile small{position:absolute;left:8px;bottom:6px;font-size:10.5px;color:var(--text-2)}
-.v-prompt{position:absolute;right:-6px;bottom:-22px;width:236px;background:#101a30;border:1px solid rgba(74,158,255,.55);border-radius:14px;padding:14px;box-shadow:0 0 0 1px rgba(74,158,255,.14),0 18px 50px rgba(0,0,0,.6),0 0 34px rgba(74,158,255,.22)}
-.v-prompt-top{display:flex;align-items:center;gap:10px;margin-bottom:12px}
-.v-prompt-top img{width:34px;height:34px;border-radius:9px}
-.v-prompt-top b{display:block;font:400 16px/1.2 var(--head)}
-.v-prompt-top small{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-2);margin-top:2px}
-.v-prompt-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.v-prompt-btns span{height:32px;border-radius:8px;display:grid;place-items:center;font-size:12.5px;font-weight:600;border:1px solid var(--line-2);color:var(--text-2)}
-.v-prompt-btns .on{background:rgba(74,158,255,.18);border-color:rgba(74,158,255,.55);color:#fff;animation:glow 2.8s ease-in-out infinite}
-
-/* card 2: who is on the call, and no bot */
-.v-people{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;width:100%;max-width:440px}
-.v-p{border:1px solid var(--line-2);border-radius:12px;background:var(--bg-2);padding:16px 6px 12px;display:grid;justify-items:center;gap:9px;font-size:12px;color:var(--text-2);text-align:center}
-.v-p i{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font:600 13px/1 'Inter',sans-serif;font-style:normal;color:#061020;background:linear-gradient(140deg,#9fd0ff,#4a9eff)}
-.v-p:nth-child(2) i{background:linear-gradient(140deg,#8ff0c6,#34d399)}
-.v-p:nth-child(3) i{background:linear-gradient(140deg,#e9e6df,#b9b4a8)}
-.v-p.bot{border-style:dashed;border-color:rgba(248,113,113,.45);background:rgba(248,113,113,.04);color:var(--text-3)}
-.v-p.bot i{background:transparent;border:1.5px dashed rgba(248,113,113,.6);color:var(--bad);font-size:17px}
-.v-p.bot s{text-decoration-color:rgba(248,113,113,.7)}
-
-/* card 3: the finished notes */
-.v-doc{width:100%;max-width:400px;border:1px solid var(--line-2);border-radius:12px;background:var(--bg-2);padding:16px 18px 18px}
-.v-doc-h{display:flex;align-items:center;gap:10px;margin-bottom:14px}
-.v-doc-h b{font:400 16px/1.2 var(--head);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.v-sec{display:grid;gap:7px;margin-top:12px}
-.v-sec em{font:500 10.5px/1 'Inter',sans-serif;font-style:normal;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
-.v-sec i{display:block;height:8px;width:var(--w);border-radius:99px;background:linear-gradient(90deg,rgba(255,255,255,.16),rgba(255,255,255,.07))}
-
-/* three smaller cards */
-.trio{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px}
-.tc{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:26px 24px}
-.tc:hover{border-color:rgba(74,158,255,.45);box-shadow:0 0 30px rgba(74,158,255,.14)}
-.key{display:inline-block;font-size:11px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;color:var(--accent-2);background:var(--accent-dim);border:1px solid rgba(74,158,255,.3);padding:5px 11px;border-radius:999px;margin-bottom:16px}
-.tc h3{font:400 21px/1.2 var(--head);margin-bottom:10px}
-.tc p{color:var(--text-2);font-size:14.5px;line-height:1.65}
-
-/* how it works */
-.hiw{list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:16px;counter-reset:hiw}
-.hiw li{position:relative;padding:76px 24px 26px;border:1px solid var(--line);border-radius:16px;background:var(--card)}
-.hiw li::before{counter-increment:hiw;content:counter(hiw);position:absolute;left:24px;top:24px;width:36px;height:36px;border-radius:50%;background:var(--accent);color:#061020;font-weight:700;font-size:16px;display:flex;align-items:center;justify-content:center}
-.hiw li::after{content:"";position:absolute;left:72px;right:-17px;top:42px;height:2px;background:linear-gradient(90deg,rgba(74,158,255,.6),rgba(74,158,255,.12))}
-.hiw li:last-child::after{right:24px;background:linear-gradient(90deg,rgba(74,158,255,.6),var(--green))}
-.hiw h3{font:400 22px/1.2 var(--head);margin-bottom:8px}
-.hiw p{color:var(--text-2);font-size:14.5px;line-height:1.65}
-
-/* privacy tiles */
-.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.tile{border:1px solid var(--line);border-radius:12px;padding:24px;background:var(--card)}
-.tile-k{display:flex;align-items:center;gap:10px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:500;color:var(--accent);margin-bottom:10px}
-.tile-k i{width:10px;height:10px;border-radius:50%;background:var(--green);flex:none}
-.tile h3{font:400 22px/1.2 var(--head);margin-bottom:8px}
-.tile p{color:var(--text-2);font-size:15px;line-height:1.6}
-.disc{max-width:760px;margin:22px auto 0;padding:14px 18px;border:1px solid rgba(74,158,255,.35);border-left:3px solid var(--accent);border-radius:10px;background:var(--accent-dim);color:#d5d8e2;font-size:15px;line-height:1.6}
-.disc strong{color:var(--text);font-weight:600}
 
 /* download: pick who you are */
+.key{display:inline-block;font-size:11px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;color:var(--accent-2);background:var(--accent-dim);border:1px solid rgba(74,158,255,.3);padding:5px 11px;border-radius:999px;margin-bottom:16px}
 .who{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:860px;margin:0 auto}
 .who-c{position:relative;display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:26px 24px;cursor:pointer;transition:border-color .3s,transform .3s,box-shadow .3s}
 .who-c:hover{border-color:rgba(74,158,255,.45);transform:translateY(-2px);box-shadow:0 0 30px rgba(74,158,255,.14)}
@@ -240,7 +105,7 @@ html[data-motion="off"] .v-wave i:nth-child(odd){height:12px}
 .who-eq{display:flex;flex-wrap:wrap;gap:6px;margin-top:18px}
 .who-eq span{font-size:12px;color:var(--text);border:1px solid var(--line-2);border-radius:999px;padding:4px 10px;background:rgba(255,255,255,.03)}
 
-#gated{margin-top:56px;animation:heroIn .7s var(--ease) both}
+#gated{margin-top:56px}
 .sub-h{font:400 clamp(24px,2.6vw,32px)/1.15 var(--head);text-align:center;margin:0 auto 24px}
 .dl{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:860px;margin:0 auto}
 .dl-c{position:relative;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;display:grid;gap:14px;align-content:start}
@@ -328,16 +193,6 @@ html[data-motion="off"] .v-wave i:nth-child(odd){height:12px}
 .wsec .wbtn{height:26px;padding:0 14px;border-radius:4px;border:1px solid #c4c4c4;background:#fdfdfd;display:grid;place-items:center}
 .help{text-align:center;color:var(--text-2);font-size:14.5px;margin-top:22px}
 
-/* FAQ */
-.faq{max-width:820px;margin:0 auto;display:grid;gap:8px}
-.faq details{background:var(--card);border:1px solid var(--line);border-radius:12px}
-.faq details:hover,.faq details[open]{border-color:rgba(74,158,255,.4)}
-.faq summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:14px;font-size:16px;font-weight:600;padding:16px 18px}
-.faq summary::-webkit-details-marker{display:none}
-.faq summary::after{content:"+";margin-left:auto;color:var(--accent);font-size:20px;font-weight:400;line-height:1}
-.faq details[open] summary::after{content:"\2212"}
-.faq p{padding:0 18px 16px;color:var(--text);opacity:.9;font-size:15px;line-height:1.65}
-
 /* closing call to action + footer */
 .cta{position:relative;max-width:1100px;margin:0 auto;padding:110px 24px 120px;text-align:center;overflow:hidden}
 .cta::before{content:"";position:absolute;left:50%;top:40px;width:720px;height:320px;transform:translateX(-50%);background:radial-gradient(closest-side,rgba(74,158,255,.20),transparent);filter:blur(10px);pointer-events:none}
@@ -400,16 +255,8 @@ footer{border-top:1px solid var(--line)}
 </style>
 </head>
 <body>
-<div id="progress" aria-hidden="true"></div>
-
 <nav class="nav" aria-label="Primary">
   <a href="#top" class="nav-logo"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDI0IiBoZWlnaHQ9IjEwMjQiIHZpZXdCb3g9IjAgMCAxMDI0IDEwMjQiPiA8ZGVmcz4gPGxpbmVhckdyYWRpZW50IGlkPSJiZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPiA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMxZDJiMjMiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwZjE2MTIiLz4gPC9saW5lYXJHcmFkaWVudD4gPGxpbmVhckdyYWRpZW50IGlkPSJzaGVlbiIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPiA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNmZmZmZmYiIHN0b3Atb3BhY2l0eT0iMC4xMCIvPjxzdG9wIG9mZnNldD0iMC41IiBzdG9wLWNvbG9yPSIjZmZmZmZmIiBzdG9wLW9wYWNpdHk9IjAiLz4gPC9saW5lYXJHcmFkaWVudD4gPC9kZWZzPiA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMTAyNCIgaGVpZ2h0PSIxMDI0IiByeD0iMjM2IiBmaWxsPSJ1cmwoI2JnKSIvPiA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMTAyNCIgaGVpZ2h0PSIxMDI0IiByeD0iMjM2IiBmaWxsPSJ1cmwoI3NoZWVuKSIvPiA8cmVjdCB4PSIxLjUiIHk9IjEuNSIgd2lkdGg9IjEwMjEiIGhlaWdodD0iMTAyMSIgcng9IjIzNC41IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS1vcGFjaXR5PSIwLjA4IiBzdHJva2Utd2lkdGg9IjMiLz4gPHBhdGggZD0iTSA2ODEuNCAzNTkuNCBBIDIyOCAyMjggMCAxIDAgNjgxLjQgNjY0LjYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2Y0ZjFlYSIgc3Ryb2tlLXdpZHRoPSI5NiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+IDxjaXJjbGUgY3g9Ijc0MC4wIiBjeT0iNTEyIiByPSI2NC4wIiBmaWxsPSIjNjJkNjlhIi8+PC9zdmc+" alt="" width="32" height="32"><span><b>Cue</b><small>by Synapse Mfg</small></span></a>
-  <ul class="nav-links">
-    <li><a href="#features">What it does</a></li>
-    <li><a href="#how">How it works</a></li>
-    <li><a href="#privacy">Privacy</a></li>
-    <li><a href="#faq">Questions</a></li>
-  </ul>
   <div class="nav-end">
     <a class="nav-signin" href="/">Sign in on the web</a>
     <a class="btn btn-primary btn-sm" href="#get">Download Cue</a>
@@ -420,128 +267,33 @@ footer{border-top:1px solid var(--line)}
 <header class="hero">
   <div class="hero-bg" aria-hidden="true"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="dots"></div></div>
   <div class="hero-in">
-    <span class="pill"><b>Cue</b><span>·</span><span>Meeting notes by Synapse Mfg</span></span>
     <h1><span class="ln"><em>Meeting notes</em></span> <span class="ln">that write themselves.</span></h1>
-    <p class="hero-sub">Cue listens to your call on your own computer, writes down both sides as you talk and has the notes ready when you hang up: decisions, numbers and next steps. No bot joins the meeting.</p>
-    <div class="hero-cta">
-      <a class="btn btn-primary btn-lg" href="#get">Download Cue</a>
-      <a class="btn btn-ghost btn-lg" href="#how">See how it works</a>
-    </div>
-    <p class="hero-note">For Synapse clients and the Synapse team. Mac and Windows.</p>
+    <p class="hero-sub">Cue listens to your call on your own computer and has the notes ready when you hang up. Here is all of it in one minute.</p>
   </div>
-
-  <div class="shot" id="shot" aria-hidden="true">
-    <div class="win">
-      <div class="win-bar"><i></i><i></i><i></i><span class="win-t">Dayton line order · Maria Alvarez</span>
-        <span class="rec off" id="rec"><span class="live-dot"></span><span id="rec-t">Call ended · 12:46</span></span></div>
-      <div class="win-body">
-        <div class="pane">
-          <div class="pane-h">Live transcript</div>
-          <div class="tl in"><b>You</b><p>Thanks for jumping on, Maria. Are we still on for forty units on the Dayton line?</p></div>
-          <div class="tl them in"><b>Maria</b><p>Yes, forty. But we need delivery by March 15th or the line start slips.</p></div>
-          <div class="tl in"><b>You</b><p>Understood. I’ll send the revised quote with freight by Wednesday.</p></div>
-          <div class="tl them in"><b>Maria</b><p>Good. I’ll have the PO over to you on Friday.</p></div>
-        </div>
-        <div class="pane">
-          <div class="pane-h">Notes<span class="chip ok" id="nt-chip">Notes ready</span></div>
-          <div class="nb in"><h4>Summary</h4><p>Maria confirmed forty units for the Dayton line. Delivery by March 15 is the date that matters.</p></div>
-          <div class="nb in"><h4>Decisions</h4><ul><li>Forty units, confirmed</li><li>Delivery by March 15</li></ul></div>
-          <div class="nb in"><h4>Action items</h4><ul><li><b>You:</b> revised quote with freight, Wednesday</li><li><b>Maria:</b> purchase order, Friday</li></ul></div>
-        </div>
-      </div>
-    </div>
+  <div class="film">
+    <video id="film" controls muted autoplay loop playsinline preload="metadata" width="1920" height="1080" poster="cue.jpg?v=4f2bf9542b" aria-label="A one-minute tour of Cue: it spots a meeting, takes notes while you talk, and writes them up when the meeting ends.">
+      <source src="cue.mp4?v=4f2bf9542b" type="video/mp4">
+    </video>
+    <p class="film-note">Plays without sound. Turn the sound on in the player if you like.</p>
   </div>
-
-  <div class="works">
-    <p class="lbl">Starts on its own with</p>
-    <ul>
-      <li>Google Meet</li><li>Zoom</li><li>Microsoft Teams</li><li>Slack huddles</li><li>Cal Video</li><li>Webex</li><li class="any">or any call you start by hand</li>
-    </ul>
+  <div class="hero-in">
+    <div class="hero-cta"><a class="btn btn-primary btn-lg" href="#get">Download Cue</a></div>
+    <p class="hero-note">Mac and Windows. For Synapse clients and the Synapse team.</p>
   </div>
 </header>
 
-<section class="sec" id="features" aria-labelledby="h-feat">
-  <span class="sec-tag" data-rv>What it does</span>
-  <h2 class="sec-h" id="h-feat" data-rv>Stay in the conversation. Cue keeps the record.</h2>
-  <div class="bento">
-    <article class="bc tall" data-rv>
-      <div class="bc-vis" aria-hidden="true">
-        <div class="v-stack"><div class="v-call">
-          <div class="v-meet">
-            <div class="v-meet-bar"><i></i><i></i><i></i><span>Meet · Dayton line order</span></div>
-            <div class="v-tiles"><div class="v-tile"><i>MA</i><small>Maria</small></div><div class="v-tile"><i>JT</i><small>James</small></div></div>
-          </div>
-          <div class="v-prompt">
-            <div class="v-prompt-top"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDI0IiBoZWlnaHQ9IjEwMjQiIHZpZXdCb3g9IjAgMCAxMDI0IDEwMjQiPiA8ZGVmcz4gPGxpbmVhckdyYWRpZW50IGlkPSJiZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPiA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMxZDJiMjMiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwZjE2MTIiLz4gPC9saW5lYXJHcmFkaWVudD4gPGxpbmVhckdyYWRpZW50IGlkPSJzaGVlbiIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPiA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNmZmZmZmYiIHN0b3Atb3BhY2l0eT0iMC4xMCIvPjxzdG9wIG9mZnNldD0iMC41IiBzdG9wLWNvbG9yPSIjZmZmZmZmIiBzdG9wLW9wYWNpdHk9IjAiLz4gPC9saW5lYXJHcmFkaWVudD4gPC9kZWZzPiA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMTAyNCIgaGVpZ2h0PSIxMDI0IiByeD0iMjM2IiBmaWxsPSJ1cmwoI2JnKSIvPiA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMTAyNCIgaGVpZ2h0PSIxMDI0IiByeD0iMjM2IiBmaWxsPSJ1cmwoI3NoZWVuKSIvPiA8cmVjdCB4PSIxLjUiIHk9IjEuNSIgd2lkdGg9IjEwMjEiIGhlaWdodD0iMTAyMSIgcng9IjIzNC41IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS1vcGFjaXR5PSIwLjA4IiBzdHJva2Utd2lkdGg9IjMiLz4gPHBhdGggZD0iTSA2ODEuNCAzNTkuNCBBIDIyOCAyMjggMCAxIDAgNjgxLjQgNjY0LjYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2Y0ZjFlYSIgc3Ryb2tlLXdpZHRoPSI5NiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+IDxjaXJjbGUgY3g9Ijc0MC4wIiBjeT0iNTEyIiByPSI2NC4wIiBmaWxsPSIjNjJkNjlhIi8+PC9zdmc+" alt=""><div><b>Take notes?</b><small><span class="live-dot"></span>Google Meet</small></div></div>
-            <div class="v-prompt-btns"><span class="on">Start</span><span>Not now</span></div>
-          </div>
-        </div>
-        <span class="v-arrow">↓</span>
-        <div class="v-pill"><span class="live-dot"></span><b>Recording</b><span>0:04</span><span class="v-wave"><i></i><i></i><i></i><i></i><i></i></span></div>
-        </div>
-      </div>
-      <div class="bc-txt"><h3>It starts when your call starts</h3><p>Cue notices a call beginning on Google Meet, Zoom, Teams and more, and asks if you want notes. Click Start. For anything else, start it by hand.</p></div>
-    </article>
-    <article class="bc" data-rv style="--i:1">
-      <div class="bc-vis" aria-hidden="true">
-        <div class="v-people">
-          <div class="v-p"><i>MA</i>Maria</div><div class="v-p"><i>JT</i>James</div><div class="v-p"><i>You</i>You</div><div class="v-p bot"><i>✕</i><s>Notetaker bot</s></div>
-        </div>
-      </div>
-      <div class="bc-txt"><h3>No bot joins the meeting</h3><p>Cue listens on your own computer. Nobody on the call sees an extra guest, and nothing is posted in the chat.</p></div>
-    </article>
-    <article class="bc" data-rv style="--i:2">
-      <div class="bc-vis" aria-hidden="true">
-        <div class="v-doc">
-          <div class="v-doc-h"><b>Dayton line order</b><span class="chip ok">Notes ready</span></div>
-          <div class="v-sec"><em>Summary</em><i style="--w:94%"></i><i style="--w:72%"></i></div>
-          <div class="v-sec"><em>Decisions</em><i style="--w:58%"></i><i style="--w:46%"></i></div>
-          <div class="v-sec"><em>Action items</em><i style="--w:82%"></i><i style="--w:64%"></i></div>
-        </div>
-      </div>
-      <div class="bc-txt"><h3>Notes when you hang up</h3><p>A summary, the key points, what was decided and who owes what by when. Cue names the call too, so you can find it later.</p></div>
-    </article>
-  </div>
-  <div class="trio">
-    <article class="tc" data-rv><span class="key">Your notes</span><h3>What you type stays word for word</h3><p>Jot things down during the call. Cue keeps every line you wrote and fills in the rest around it.</p></article>
-    <article class="tc" data-rv style="--i:1"><span class="key">Transcript</span><h3>Both sides, labelled</h3><p>The full transcript sits next to the notes and shows what you said and what they said.</p></article>
-    <article class="tc" data-rv style="--i:2"><span class="key">Search</span><h3>Find any call in seconds</h3><p>Search titles, people, notes and transcripts across everything you have recorded.</p></article>
-  </div>
-</section>
-
-<section class="sec tight" id="how" aria-labelledby="h-how">
-  <span class="sec-tag" data-rv>How it works</span>
-  <h2 class="sec-h" id="h-how" data-rv>One click when the call starts. Notes when it ends.</h2>
-  <ol class="hiw">
-    <li data-rv><h3>Join your call as usual</h3><p>Open your Meet, Zoom or Teams call the way you always do. Cue asks if you want notes. Click Start.</p></li>
-    <li data-rv style="--i:1"><h3>Talk</h3><p>Cue writes down both sides while you talk. Add your own notes in the notepad if you like.</p></li>
-    <li data-rv style="--i:2"><h3>Hang up</h3><p>Cue writes the notes and a title in about a minute. They are waiting in the app the next time you look.</p></li>
-  </ol>
-</section>
-
-<section class="sec tight" id="privacy" aria-labelledby="h-priv">
-  <span class="sec-tag" data-rv>Privacy</span>
-  <h2 class="sec-h" id="h-priv" data-rv>Your calls stay yours.</h2>
-  <div class="tiles">
-    <div class="tile" data-rv><div class="tile-k"><i></i>Private</div><h3>Only you and your Synapse team</h3><p>Clients see their own calls and nothing else. No other client, and nobody outside Synapse, can open them.</p></div>
-    <div class="tile" data-rv style="--i:1"><div class="tile-k"><i></i>Quiet</div><h3>Nothing joins, nothing posts</h3><p>Cue never enters your meeting, writes in the chat or emails the people on the call.</p></div>
-    <div class="tile" data-rv style="--i:2"><div class="tile-k"><i></i>Checked</div><h3>A download you can trust</h3><p>The installer is checked against its fingerprint before it is saved. After that, Cue updates itself.</p></div>
-  </div>
-  <p class="disc" data-rv><strong>Tell people you are taking notes.</strong> Cue does not announce itself on the call, and recording rules differ by state and country, so let the others know.</p>
-</section>
-
 <section class="sec" id="get" aria-labelledby="h-get">
-  <span class="sec-tag" data-rv>Download</span>
-  <h2 class="sec-h" id="h-get" data-rv>Which one are you?</h2>
-  <p class="sec-sub" data-rv>It is the same app for both. What you see inside depends on how you sign in.</p>
+  <span class="sec-tag">Download</span>
+  <h2 class="sec-h" id="h-get">Which one are you?</h2>
+  <p class="sec-sub">It is the same app for both. What you see inside depends on how you sign in.</p>
   <div class="who">
-    <button class="who-c" id="who-client" aria-pressed="false" data-rv>
+    <button class="who-c" id="who-client" aria-pressed="false">
       <span class="key">For clients</span>
       <span class="who-t">I’m a Synapse client <span class="ar">→</span></span>
       <span class="who-p">A note taker for your own calls. Sign in with your email and the code from your Cue invite.</span>
       <span class="who-eq"><span>Notes</span><span>Transcript</span><span>Search</span></span>
     </button>
-    <button class="who-c" id="who-team" aria-pressed="false" data-rv style="--i:1">
+    <button class="who-c" id="who-team" aria-pressed="false">
       <span class="key">For the team</span>
       <span class="who-t">I’m on the Synapse team <span class="ar">→</span></span>
       <span class="who-p">Everything clients have, plus the live sales coach, team calls and What wins. Sign in with your work email and the team PIN.</span>
@@ -632,34 +384,13 @@ footer{border-top:1px solid var(--line)}
   </div>
 </section>
 
-<section class="sec tight" id="faq" aria-labelledby="h-faq">
-  <span class="sec-tag" data-rv>Questions</span>
-  <h2 class="sec-h" id="h-faq" data-rv>Questions people ask before they install it.</h2>
-  <div class="faq" data-rv>
-    <details><summary>Does a bot join my meeting?</summary><p>No. Cue listens on your own computer, through your microphone and your speakers, so nothing joins the call. Because nothing announces it, let people know you are taking notes.</p></details>
-    <details><summary>Which calls does it work with?</summary><p>Cue starts on its own for Google Meet, Zoom, Microsoft Teams, Slack huddles, Cal Video and Webex. For anything else, click Start a call in Cue.</p></details>
-    <details><summary>Why does my computer warn me about Cue?</summary><p>Windows and macOS warn about any app that isn’t registered (“signed”) with Microsoft or Apple. Cue is built by Synapse for our own team and clients, so it isn’t registered yet. The warning is about the missing registration, not about anything Cue does.</p></details>
-    <details><summary>Is it safe?</summary><p>Yes. Cue only records the calls you start or allow, and keeps them in a private workspace. Clients only see their own calls. The download is checked against a fingerprint before it’s saved, so a damaged or swapped file is refused.</p></details>
-    <details><summary>Who can use it?</summary><p>Synapse’s team, and people at Synapse’s clients who have been invited. Clients only ever see their own calls. Their Synapse team sees them too, so you are never asked to send notes over.</p></details>
-    <details><summary>I don’t have an invite. How do I get one?</summary><p>Ask your Synapse contact. They add your email and send you a personal code to sign in with.</p></details>
-    <details><summary>Do I go through the install warnings again for updates?</summary><p>No. Cue updates itself. You only see the warnings the first time you install it on a computer.</p></details>
-  </div>
-</section>
-
-<section class="cta" aria-labelledby="h-cta">
-  <span class="sec-tag" data-rv>Next step</span>
-  <h2 class="sec-h" id="h-cta" data-rv>Let your next call write its own notes.</h2>
-  <p class="sec-sub" data-rv>Download Cue, sign in, and join your next call the way you always do.</p>
-  <a class="btn btn-primary btn-lg" href="#get" data-rv>Download Cue</a>
-  <p class="cta-note" data-rv>No invite yet? Ask your Synapse contact.</p>
-</section>
 </main>
 
 <footer>
   <div class="foot">
     <div>
       <div class="foot-brand"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDI0IiBoZWlnaHQ9IjEwMjQiIHZpZXdCb3g9IjAgMCAxMDI0IDEwMjQiPiA8ZGVmcz4gPGxpbmVhckdyYWRpZW50IGlkPSJiZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPiA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMxZDJiMjMiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwZjE2MTIiLz4gPC9saW5lYXJHcmFkaWVudD4gPGxpbmVhckdyYWRpZW50IGlkPSJzaGVlbiIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPiA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNmZmZmZmYiIHN0b3Atb3BhY2l0eT0iMC4xMCIvPjxzdG9wIG9mZnNldD0iMC41IiBzdG9wLWNvbG9yPSIjZmZmZmZmIiBzdG9wLW9wYWNpdHk9IjAiLz4gPC9saW5lYXJHcmFkaWVudD4gPC9kZWZzPiA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMTAyNCIgaGVpZ2h0PSIxMDI0IiByeD0iMjM2IiBmaWxsPSJ1cmwoI2JnKSIvPiA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMTAyNCIgaGVpZ2h0PSIxMDI0IiByeD0iMjM2IiBmaWxsPSJ1cmwoI3NoZWVuKSIvPiA8cmVjdCB4PSIxLjUiIHk9IjEuNSIgd2lkdGg9IjEwMjEiIGhlaWdodD0iMTAyMSIgcng9IjIzNC41IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS1vcGFjaXR5PSIwLjA4IiBzdHJva2Utd2lkdGg9IjMiLz4gPHBhdGggZD0iTSA2ODEuNCAzNTkuNCBBIDIyOCAyMjggMCAxIDAgNjgxLjQgNjY0LjYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2Y0ZjFlYSIgc3Ryb2tlLXdpZHRoPSI5NiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+IDxjaXJjbGUgY3g9Ijc0MC4wIiBjeT0iNTEyIiByPSI2NC4wIiBmaWxsPSIjNjJkNjlhIi8+PC9zdmc+" alt="" width="28" height="28">Cue</div>
-      <p>Meeting notes and live call coaching, built by Synapse Mfg for our team and our clients.</p>
+      <p>Meeting notes, built by Synapse Mfg for our clients and our team.</p>
       <a class="by" href="https://synapsemfg.com/" rel="noopener"><img src="data:image/png;base64,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" alt="" width="20" height="20">synapsemfg.com</a>
     </div>
     <div>
@@ -667,14 +398,10 @@ footer{border-top:1px solid var(--line)}
       <ul>
         <li><a href="#get">Download for Mac or Windows</a></li>
         <li><a href="/">Sign in on the web</a></li>
-        <li><a href="#how">How it works</a></li>
-        <li><a href="#faq">Questions</a></li>
       </ul>
     </div>
   </div>
 </footer>
-
-<button class="motion-btn" id="motion" type="button" data-state="on" aria-pressed="false"><svg class="i-pause" viewBox="0 0 12 12" aria-hidden="true"><rect x="1.5" y="1" width="3.2" height="10" rx="1"/><rect x="7.3" y="1" width="3.2" height="10" rx="1"/></svg><svg class="i-play" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 1.2v9.6a.6.6 0 0 0 .92.5l7.3-4.8a.6.6 0 0 0 0-1L3.42.7a.6.6 0 0 0-.92.5z"/></svg><span id="motion-t">Pause animations</span></button>
 
 <script>
 (function () {
@@ -684,71 +411,9 @@ footer{border-top:1px solid var(--line)}
   var $ = function (id) { return document.getElementById(id); };
   var each = function (sel, fn) { Array.prototype.forEach.call(document.querySelectorAll(sel), fn); };
 
-  // ---- scroll progress + reveal --------------------------------------------------------
-  var bar = $('progress'), ticking = false;
-  function progress() {
-    var max = document.documentElement.scrollHeight - window.innerHeight;
-    bar.style.transform = 'scaleX(' + (max > 0 ? Math.min(1, window.scrollY / max) : 0) + ')';
-    ticking = false;
-  }
-  window.addEventListener('scroll', function () { if (!ticking) { ticking = true; requestAnimationFrame(progress); } }, { passive: true });
-  if ('IntersectionObserver' in window) {
-    root.classList.add('rv');
-    var io = new IntersectionObserver(function (es) {
-      es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
-    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
-    each('[data-rv]', function (el) { io.observe(el); });
-  }
-
-  // ---- the hero drawing: a call, then its notes -------------------------------------------
-  var shot = $('shot'), rec = $('rec'), recT = $('rec-t'), chip = $('nt-chip');
-  var lines = shot.querySelectorAll('.tl'), blocks = shot.querySelectorAll('.nb');
-  var timers = [], tick = null;
-  function stop() { timers.forEach(clearTimeout); timers = []; clearInterval(tick); }
-  function at(ms, fn) { timers.push(setTimeout(fn, ms)); }
-  function clock(s) { return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
-  function still() {
-    stop(); shot.classList.remove('anim');
-    Array.prototype.forEach.call(lines, function (el) { el.classList.add('in'); });
-    Array.prototype.forEach.call(blocks, function (el) { el.classList.add('in'); });
-    rec.classList.add('off'); recT.textContent = 'Call ended · 12:46';
-    chip.className = 'chip ok'; chip.textContent = 'Notes ready';
-  }
-  function play() {
-    stop(); shot.classList.add('anim');
-    Array.prototype.forEach.call(lines, function (el) { el.classList.remove('in'); });
-    Array.prototype.forEach.call(blocks, function (el) { el.classList.remove('in'); });
-    var s = 12 * 60 + 38;
-    rec.classList.remove('off'); recT.textContent = 'Recording ' + clock(s);
-    chip.className = 'chip'; chip.textContent = 'Listening';
-    tick = setInterval(function () { s += 1; recT.textContent = 'Recording ' + clock(s); }, 1000);
-    var t = 700;
-    Array.prototype.forEach.call(lines, function (el) { at(t, function () { el.classList.add('in'); }); t += 1700; });
-    at(t, function () { clearInterval(tick); rec.classList.add('off'); recT.textContent = 'Call ended · ' + clock(s); chip.className = 'chip busy'; chip.textContent = 'Writing notes…'; });
-    t += 1400;
-    Array.prototype.forEach.call(blocks, function (el) { at(t, function () { el.classList.add('in'); }); t += 800; });
-    at(t, function () { chip.className = 'chip ok'; chip.textContent = 'Notes ready'; });
-    at(t + 7000, play);
-  }
-
-  // ---- pause / play animations ------------------------------------------------------------
-  var motionBtn = $('motion'), motionT = $('motion-t');
-  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var saved = null; try { saved = localStorage.getItem('cue-motion'); } catch (e) {}
-  function setMotion(on, remember) {
-    root.setAttribute('data-motion', on ? 'on' : 'off');
-    motionBtn.setAttribute('data-state', on ? 'on' : 'off');
-    motionBtn.setAttribute('aria-pressed', on ? 'false' : 'true');
-    motionT.textContent = on ? 'Pause animations' : 'Play animations';
-    if (on) play(); else still();
-    if (remember) { try { localStorage.setItem('cue-motion', on ? 'on' : 'off'); } catch (e) {} }
-  }
-  motionBtn.onclick = function () { setMotion(root.getAttribute('data-motion') === 'off', true); };
-  setMotion(saved ? saved === 'on' : !reduced, false);
-  document.addEventListener('visibilitychange', function () {
-    if (root.getAttribute('data-motion') === 'off') return;
-    if (document.hidden) stop(); else play();
-  });
+  // ---- the video: no autoplay for people who ask for less motion ---------------------------
+  var film = $('film');
+  if (film && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { film.removeAttribute('autoplay'); film.removeAttribute('loop'); try { film.pause(); } catch (e) {} }
 
   // ---- client or team ---------------------------------------------------------------------
   var gated = $('gated');
