@@ -81,10 +81,8 @@ function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-// Markdown from Claude: raw HTML in it is shown as text, never rendered.
-const md = new marked.Marked({ gfm: true, breaks: false });
-md.use({ renderer: { html: (token) => esc(token.raw ?? token.text ?? '') } });
-const renderMd = (text) => md.parse(String(text || ''));
+// renderMd and cleanHtml live in md.js (loaded first): markdown from notes, briefs
+// and Claude is rebuilt from a short allowlist of tags before it reaches the page.
 
 function fmtDur(ms) {
   const m = Math.max(1, Math.round((ms || 0) / 60000));
@@ -477,8 +475,7 @@ async function renderCall(id) {
   page.addEventListener('drop', async (e) => {
     if (!e.dataTransfer?.files?.length) return;
     e.preventDefault(); page.classList.remove('drop');
-    const paths = [...e.dataTransfer.files].map((f) => window.cue.pathForFile(f)).filter(Boolean);
-    const r = await call('files:drop', { meetingId: c.id, paths });
+    const r = await window.cue.dropFiles(c.id, [...e.dataTransfer.files]);
     if (!r.ok) alert(r.error); loadFiles();
   });
   $view.replaceChildren(page);

@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-dHYv82cPTRWC9zDt7xtBiC93LSHLGfT2jAMFBOn3wBo='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://vnukfvbmimakiotsanjv.supabase.co; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <meta name="theme-color" content="#070b16">
@@ -678,6 +679,7 @@ footer{border-top:1px solid var(--line)}
 <script>
 (function () {
   var BASE = "https://vnukfvbmimakiotsanjv.supabase.co/storage/v1/object/public/releases";
+  var KEY = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE6xX6eRNhK3HOaPcdbBonvUhgU5w2QP4orqqI19bdXl7Dcu5OwtFqinx7Jg9kfbJiJJnnyk8RzhW0kBAmEuhUmw==";   // public half of the key Cue's releases are signed with
   var root = document.documentElement;
   var $ = function (id) { return document.getElementById(id); };
   var each = function (sel, fn) { Array.prototype.forEach.call(document.querySelectorAll(sel), fn); };
@@ -782,13 +784,30 @@ footer{border-top:1px solid var(--line)}
   var mb = function (n) { return Math.round(n / 1048576) + ' MB'; };
   function b64(buf) { var s = ''; var b = new Uint8Array(buf); for (var i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); }
 
+  // Only installers signed by Cue's release key are offered.
+  function unb64(s) { var b = atob(s), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+  function genuine(os, a) {
+    try {
+      if (!a || typeof a.sig !== 'string' || !window.crypto || !crypto.subtle) return Promise.resolve(false);
+      if (!/^Cue[\w.-]*\.(exe|dmg)$/.test(a.file) || !a.parts || !a.parts.length) return Promise.resolve(false);
+      for (var i = 0; i < a.parts.length; i++) if (a.parts[i].path !== a.version + '/' + a.file + '.part' + i) return Promise.resolve(false);
+      var text = ['cue-update-v1', os, a.version, a.file, a.size, a.sha512].join('\n');
+      return crypto.subtle.importKey('spki', unb64(KEY), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify'])
+        .then(function (k) { return crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, k, unb64(a.sig), new TextEncoder().encode(text)); })
+        .catch(function () { return false; });
+    } catch (e) { return Promise.resolve(false); }
+  }
+
   fetch(BASE + '/latest.json', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (rel) {
     ['mac', 'win'].forEach(function (os) {
       var a = rel[os]; var btn = $('btn-' + os);
       if (!a) { btn.textContent = 'Not available yet'; return; }
-      $('size-' + os).textContent += ' · ' + mb(a.size) + ' · version ' + rel.version;
-      btn.disabled = false;
-      btn.onclick = function () { get(os, a, btn); };
+      genuine(os, a).then(function (ok) {
+        if (!ok) { btn.textContent = 'Not available right now'; return; }
+        $('size-' + os).textContent += ' · ' + mb(a.size) + ' · version ' + a.version;
+        btn.disabled = false;
+        btn.onclick = function () { get(os, a, btn); };
+      });
     });
   }).catch(function () { $('dl-err').hidden = false; });
 

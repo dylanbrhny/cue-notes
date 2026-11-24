@@ -2,7 +2,7 @@
 (() => {
   const listeners = {}; const waiting = {}; let n = 0;
   window.addEventListener('message', (e) => {
-    if (e.source !== window.parent || !e.data) return;
+    if (e.source !== window.parent || e.origin !== location.origin || !e.data) return;
     if (e.data.cueCard === 'state') (listeners['overlay:state'] || []).forEach((cb) => cb(e.data.state));
     if (e.data.cueCard === 'reply' && waiting[e.data.id]) { waiting[e.data.id](e.data.result); delete waiting[e.data.id]; }
   });

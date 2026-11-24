@@ -12,7 +12,7 @@ function renderSignIn(message) {
   const email = h('input', { type: 'text', placeholder: asClient ? 'you@yourcompany.com' : 'you@synapsemfg.com', autocomplete: 'username', spellcheck: 'false' });
   const pin = asClient
     ? h('input', { type: 'text', placeholder: 'From your Cue invite', autocomplete: 'off', maxlength: '12', class: 'pin-input', spellcheck: 'false', style: 'text-transform:uppercase' })
-    : h('input', { type: 'password', inputmode: 'numeric', placeholder: '••••', autocomplete: 'off', maxlength: '8', class: 'pin-input' });
+    : h('input', { type: 'password', inputmode: 'numeric', placeholder: '••••', autocomplete: 'off', maxlength: '12', class: 'pin-input' });
   const err = h('div', { class: 'form-error' }, message || '');
   const btn = h('button', { class: 'btn primary', type: 'submit' }, 'Sign in');
   const tab = (who, label) => h('button', { type: 'button', class: `chip-btn ${signinAs === who ? 'on' : ''}`, onclick: () => { signinAs = who; renderSignIn(); } }, label);
@@ -20,7 +20,7 @@ function renderSignIn(message) {
     e.preventDefault();
     err.textContent = '';
     if (!/^\S+@\S+\.\S+$/.test(email.value.trim())) { err.textContent = asClient ? 'Enter your email.' : 'Enter your work email.'; return; }
-    if (asClient ? !/^[A-Za-z0-9]{6,12}$/.test(pin.value.trim()) : !/^\d{4,8}$/.test(pin.value.trim())) { err.textContent = asClient ? 'Enter the code from your invite.' : 'Enter the team PIN (numbers only).'; return; }
+    if (asClient ? !/^[A-Za-z0-9]{6,12}$/.test(pin.value.trim()) : !/^\d{4,12}$/.test(pin.value.trim())) { err.textContent = asClient ? 'Enter the code from your invite.' : 'Enter the team PIN (numbers only).'; return; }
     btn.disabled = true; btn.textContent = 'Signing in…';
     const r = await call('auth:signIn', { email: email.value, pin: pin.value, asClient });
     btn.disabled = false; btn.textContent = 'Sign in';
@@ -315,7 +315,7 @@ async function renderAdmin() {
   knowledge.addEventListener('input', save);
   panels.push(h('div', { class: 'panel' }, h('div', { class: 'row', style: 'margin-bottom:12px' }, h('h3', { style: 'margin:0;flex:1' }, 'Who we are and how we sell'), saved),
     field('Company profile', profile, ws.shared ? 'Shared with the team.' : 'Saved on this computer until you sign in.'),
-    field('Sales playbook', knowledge, ws.knowledge ? 'Your own playbook replaces the built-in one.' : `Using the built-in closing playbook (${Math.round((ws.bundledKnowledge || '').split(/\s+/).length / 10) * 10} words): sell the dream outcome, not features.`),
+    field('Sales playbook', knowledge, ws.knowledge ? 'Shared with the team. Cue coaches and grades calls against it.' : 'No playbook yet. Paste how your team sells (offer, prices, objections) and Cue will coach against it.'),
     !ws.knowledge && ws.bundledKnowledge ? h('div', { class: 'row', style: 'margin:-4px 0 12px' }, h('button', { class: 'link-btn', onclick: () => { knowledge.value = ws.bundledKnowledge; save(); } }, 'Copy the built-in playbook here to edit it')) : null));
 
   panels.push(await coachingPanel(), await teamCalendarPanel(), await shareDomainPanel());
@@ -507,7 +507,6 @@ async function contextPanel() {
 // Admin → Clients: Cue for clients (a note taker). Invite people at a client;
 // each gets a personal code. They only ever see their own calls; the team sees
 // everything they record (in the Clients space).
-const KNOWN_CLIENTS = ['Entech Fabrications', 'APG Sensors', 'FireTech Supplies', 'Klimer Platforms', 'QSD Curtains', 'AuldTech'];
 const orgKeyOf = (name) => String(name || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').trim().split(/\s+/)[0] || '';
 function inviteText({ name, email, code }) {
   return [`Hi ${String(name || '').split(' ')[0] || 'there'},`, '',
@@ -521,7 +520,7 @@ async function clientsPanel() {
   const out = h('div', { class: 'test-out' });
   const name = h('input', { type: 'text', class: 'input', placeholder: 'Name' });
   const email = h('input', { type: 'email', class: 'input', placeholder: 'name@client.com' });
-  const orgs = [...new Set([...data.orgs.map((o) => o.name), ...KNOWN_CLIENTS])];
+  const orgs = [...new Set(data.orgs.map((o) => o.name))];   // companies already invited (the list lives in the database, not in the app)
   const company = h('input', { type: 'text', class: 'input', placeholder: 'Company', list: 'client-orgs' });
   const showInvite = (r, who) => {
     const text = inviteText({ name: who.name, email: r.email, code: r.code });
@@ -624,7 +623,7 @@ async function adminPanel() {
   const name = h('input', { type: 'text', placeholder: 'Name', class: 'input' });
   const email = h('input', { type: 'text', placeholder: 'name@synapsemfg.com', class: 'input', spellcheck: 'false' });
   const role = h('select', { class: 'input' }, h('option', { value: 'member' }, 'Member'), h('option', { value: 'admin' }, 'Admin'));
-  const pin = h('input', { type: 'password', inputmode: 'numeric', placeholder: 'New PIN', class: 'input pin-input', maxlength: '8' });
+  const pin = h('input', { type: 'password', inputmode: 'numeric', placeholder: 'New PIN', class: 'input pin-input', maxlength: '12' });
   const pinMsg = h('span', { class: 'saved' });
   return h('div', { class: 'panel' }, h('h3', {}, 'Team'),
     h('ul', { class: 'members' }, members.map((m) => h('li', {},
@@ -646,8 +645,8 @@ async function adminPanel() {
     err,
     h('form', { class: 'row', style: 'margin:6px 0 12px', onsubmit: async (e) => {
       e.preventDefault();
-      if (!/^\d{4,8}$/.test(pin.value)) { pinMsg.textContent = 'Use 4 to 8 digits.'; return; }
-      if (!confirm('Change the team PIN? Everyone signs in with the new one from now on; people already signed in stay signed in.')) return;
+      if (!/^\d{6,12}$/.test(pin.value)) { pinMsg.textContent = 'Use 6 to 12 digits.'; return; }
+      if (!confirm('Change the team PIN? Everyone else is signed out and signs back in with the new PIN. Tell the team first.')) return;
       const r = await call('team:setPin', pin.value);
       pinMsg.textContent = r.ok ? 'PIN changed. Tell the team.' : r.error; pin.value = '';
     } }, h('span', { class: 'lbl', style: 'margin-right:4px' }, 'Team PIN'), pin, h('button', { class: 'btn', type: 'submit' }, 'Change PIN'), pinMsg));

@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-u5XUwV8SifeEhuqs6/O7GGiEde1YoEDvdi7UkzcJBUI=' 'sha256-nrjNfntQq5hpFFbnV5Zyx2f1/oEnPtAqcVUxOw7+KCU=' 'sha256-wUl/1e1P0/5eWZFRHKh6zCGDbbM4biLp4VxWdDVVu7c='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://vnukfvbmimakiotsanjv.supabase.co; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <meta name="referrer" content="no-referrer">
@@ -152,15 +153,65 @@ Please report this to https://github.com/markedjs/marked.`,e){let r="<p>An error
 if(__exports != exports)module.exports = exports;return module.exports}));
 //# sourceMappingURL=marked.umd.js.map
 </script>
+<script>// Safe markdown for Cue: used by the desktop app, the web app and the public share
+// page (tools/build-share-page.js inlines this file). Needs `marked` loaded first.
+/* global marked */
+const mdEsc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// Markdown from notes, briefs and Claude. Three layers, because this text can be
+// written by other people (clients, teammates) and by the model:
+//  1. raw HTML tokens are shown as text;
+//  2. marked's "already escaped" text is never trusted, and links may only be web or mail links;
+//  3. the HTML marked returns is rebuilt from a short allowlist of tags (cleanHtml),
+//     so nothing else (scripts, images, event handlers, styles) can reach the page.
+const md = new marked.Marked({ gfm: true, breaks: false });
+md.use({ renderer: { html: (token) => mdEsc(token.raw ?? token.text ?? '') } });
+md.use({ walkTokens: (t) => {
+  if (t.escaped) t.escaped = false;
+  if ((t.type === 'link' || t.type === 'image') && !/^(https?:\/\/|mailto:)/i.test(String(t.href || '').trim())) t.href = '#';
+} });
+const MD_TAGS = new Set(['P', 'BR', 'STRONG', 'EM', 'B', 'I', 'U', 'S', 'DEL', 'UL', 'OL', 'LI', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'CODE', 'PRE', 'A', 'HR', 'TABLE', 'THEAD', 'TBODY', 'TR', 'TH', 'TD', 'INPUT']);
+const MD_DROP = new Set(['SCRIPT', 'STYLE', 'IFRAME', 'FRAME', 'OBJECT', 'EMBED', 'TEMPLATE', 'NOSCRIPT', 'TEXTAREA', 'TITLE', 'XMP', 'PLAINTEXT', 'LINK', 'META', 'BASE', 'FORM', 'SELECT', 'BUTTON']);
+function cleanHtml(html) {
+  const tpl = document.createElement('template');
+  tpl.innerHTML = String(html || '');   // inert: nothing inside a template loads or runs
+  const out = document.createElement('div');
+  const copy = (from, to) => {
+    for (const n of from.childNodes) {
+      if (n.nodeType === 3) { to.append(document.createTextNode(n.nodeValue)); continue; }
+      if (n.nodeType !== 1) continue;
+      const tag = String(n.tagName).toUpperCase();
+      if (n.namespaceURI !== 'http://www.w3.org/1999/xhtml' || MD_DROP.has(tag)) continue;   // svg, math and friends: gone, with their contents
+      if (!MD_TAGS.has(tag)) { copy(n, to); continue; }                                      // unknown tag: keep its text only
+      const el = document.createElement(tag.toLowerCase());
+      if (tag === 'A') {
+        const href = String(n.getAttribute('href') || '').trim();
+        if (/^(https?:\/\/|mailto:)/i.test(href)) { el.setAttribute('href', href); el.setAttribute('target', '_blank'); el.setAttribute('rel', 'noopener noreferrer'); }
+      } else if (tag === 'INPUT') {
+        if (n.getAttribute('type') !== 'checkbox') continue;
+        el.setAttribute('type', 'checkbox'); el.setAttribute('disabled', '');
+        if (n.hasAttribute('checked')) el.setAttribute('checked', '');
+      } else if (tag === 'TH' || tag === 'TD') {
+        const a = n.getAttribute('align'); if (/^(left|right|center)$/.test(a || '')) el.setAttribute('align', a);
+      } else if (tag === 'OL') {
+        const st = n.getAttribute('start'); if (/^\d{1,6}$/.test(st || '')) el.setAttribute('start', st);
+      }
+      copy(n, el);
+      to.append(el);
+    }
+  };
+  copy(tpl.content, out);
+  return out.innerHTML;
+}
+const renderMd = (text) => cleanHtml(md.parse(String(text || '')));
+</script>
 <script>
 (function () {
   var SUPABASE = {"url":"https://vnukfvbmimakiotsanjv.supabase.co","anonKey":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZudWtmdmJtaW1ha2lvdHNhbmp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUyOTM0NTEsImV4cCI6MjExMDg2OTQ1MX0.qUPeYdlA-6CG0EnRqJ9FtrhaQWc_hxR7P1dSTIF0uOM"};
   var main = document.getElementById('main');
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-  var md = new marked.Marked({ gfm: true, breaks: false });
-  md.use({ renderer: { html: function (t) { return esc(t.raw || t.text || ''); } } });
-  // Links in notes only open http(s) pages.
-  md.use({ walkTokens: function (t) { if ((t.type === 'link' || t.type === 'image') && !/^https?:\/\//i.test(t.href || '')) t.href = '#'; } });
+  // Notes are written by other people and by the model: renderMd (src/renderer/md.js,
+  // inlined above) rebuilds them from a short allowlist of tags. No scripts, images or handlers.
 
   function token() {
     var q = new URLSearchParams(location.search).get('id');
@@ -214,7 +265,7 @@ if(__exports != exports)module.exports = exports;return module.exports}));
       + '<h1>' + esc(m.title || 'Untitled call') + '</h1>'
       + (others.length ? '<div class="people">' + others.map(function (a) { return '<span class="chip">' + esc(a) + '</span>'; }).join('') + '</div>' : '')
       + '<div class="tabs"><button data-t="notes" class="on">Notes</button><button data-t="transcript">Transcript</button></div>'
-      + '<section id="notes" class="md">' + (m.notes ? md.parse(m.notes) : '<div class="empty">No notes were written for this meeting.</div>') + '</section>'
+      + '<section id="notes" class="md">' + (m.notes ? renderMd(m.notes) : '<div class="empty">No notes were written for this meeting.</div>') + '</section>'
       + '<section id="transcript" hidden><div class="lines">' + (lines.length ? lines.map(function (l) {
           var me = /^(me|rep)$/i.test(l.who || '');
           return '<div class="line' + (me ? ' me' : '') + '"><span class="t">' + (l.at != null ? clock(l.at) : '') + '</span><div>' + (l.who ? '<b>' + esc(name(l.who)) + '</b>' : '') + '<p>' + esc(l.text) + '</p></div></div>';
