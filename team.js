@@ -6,33 +6,40 @@
 // Sign-in
 // ---------------------------------------------------------------------------
 
+let signinAs = 'team'; // 'team' | 'client'
 function renderSignIn(message) {
-  const email = h('input', { type: 'text', placeholder: 'you@synapsemfg.com', autocomplete: 'username', spellcheck: 'false' });
-  const pin = h('input', { type: 'password', inputmode: 'numeric', placeholder: '••••', autocomplete: 'off', maxlength: '8', class: 'pin-input' });
+  const asClient = signinAs === 'client';
+  const email = h('input', { type: 'text', placeholder: asClient ? 'you@yourcompany.com' : 'you@synapsemfg.com', autocomplete: 'username', spellcheck: 'false' });
+  const pin = asClient
+    ? h('input', { type: 'text', placeholder: 'From your Cue invite', autocomplete: 'off', maxlength: '12', class: 'pin-input', spellcheck: 'false', style: 'text-transform:uppercase' })
+    : h('input', { type: 'password', inputmode: 'numeric', placeholder: '••••', autocomplete: 'off', maxlength: '8', class: 'pin-input' });
   const err = h('div', { class: 'form-error' }, message || '');
   const btn = h('button', { class: 'btn primary', type: 'submit' }, 'Sign in');
+  const tab = (who, label) => h('button', { type: 'button', class: `chip-btn ${signinAs === who ? 'on' : ''}`, onclick: () => { signinAs = who; renderSignIn(); } }, label);
   const form = h('form', { class: 'signin', onsubmit: async (e) => {
     e.preventDefault();
     err.textContent = '';
-    if (!/^\S+@\S+\.\S+$/.test(email.value.trim())) { err.textContent = 'Enter your work email.'; return; }
-    if (!/^\d{4,8}$/.test(pin.value.trim())) { err.textContent = 'Enter the team PIN (numbers only).'; return; }
+    if (!/^\S+@\S+\.\S+$/.test(email.value.trim())) { err.textContent = asClient ? 'Enter your email.' : 'Enter your work email.'; return; }
+    if (asClient ? !/^[A-Za-z0-9]{6,12}$/.test(pin.value.trim()) : !/^\d{4,8}$/.test(pin.value.trim())) { err.textContent = asClient ? 'Enter the code from your invite.' : 'Enter the team PIN (numbers only).'; return; }
     btn.disabled = true; btn.textContent = 'Signing in…';
-    const r = await call('auth:signIn', { email: email.value, pin: pin.value });
+    const r = await call('auth:signIn', { email: email.value, pin: pin.value, asClient });
     btn.disabled = false; btn.textContent = 'Sign in';
     if (!r.ok) { err.textContent = r.error; pin.value = ''; pin.focus(); return; }
     authState = await call('auth:state');
-    renderAccount(); renderTeamLive(); presetsChanged();
+    renderAccount(); renderNav(); renderFolders(); renderTeamLive(); presetsChanged();
     go({ view: 'home' });
   } },
   h('img', { class: 'signin-logo', src: 'assets/logo.svg', alt: '' }),
-  h('h1', {}, 'Sign in to your team'),
-  h('p', { class: 'signin-by' }, 'Cue is Synapse Mfg’s in-house call coach and note taker.'),
-  h('p', {}, 'Your calls, notes and presets are shared with the Synapse team. Use your work email and the team PIN.'),
-  h('div', { class: 'field' }, h('label', {}, 'Work email'), email),
-  h('div', { class: 'field' }, h('label', {}, 'Team PIN'), pin),
+  h('h1', {}, asClient ? 'Sign in to Cue' : 'Sign in to your team'),
+  h('div', { class: 'row', style: 'gap:6px;margin:-4px 0 12px' }, tab('team', 'Synapse team'), tab('client', 'Client')),
+  asClient
+    ? h('p', {}, 'Cue records your meetings and writes the notes for you. Use the email and the code from your Cue invite (your Synapse contact sends it).')
+    : [h('p', { class: 'signin-by' }, 'Cue is Synapse Mfg’s in-house call coach and note taker.'), h('p', {}, 'Your calls, notes and presets are shared with the Synapse team. Use your work email and the team PIN.')],
+  h('div', { class: 'field' }, h('label', {}, asClient ? 'Email' : 'Work email'), email),
+  h('div', { class: 'field' }, h('label', {}, asClient ? 'Invite code' : 'Team PIN'), pin),
   err,
   h('div', { class: 'row' }, btn,
-    WEB ? null : h('button', { class: 'link-btn', type: 'button', onclick: () => { sessionStorage.setItem('cue-offline', '1'); go({ view: 'home' }); } }, 'Use without signing in')));
+    WEB || asClient ? null : h('button', { class: 'link-btn', type: 'button', onclick: () => { sessionStorage.setItem('cue-offline', '1'); go({ view: 'home' }); } }, 'Use without signing in')));
   $view.replaceChildren(form);
   setTimeout(() => email.focus(), 50);
 }
@@ -56,7 +63,7 @@ function renderAccount() {
 
 let teamLiveKey = '';
 async function renderTeamLive() {
-  teamLive = authState.user ? await call('team:live').catch(() => []) : [];
+  teamLive = authState.user && !isClientUser() ? await call('team:live').catch(() => []) : [];
   const key = teamLive.map((c) => c.id).join(',');
   if (key === teamLiveKey) return;
   teamLiveKey = key;
@@ -296,7 +303,7 @@ async function teamSettingsPanels(s) {
 async function renderAdmin() {
   if (authState.user?.role !== 'admin') return go({ view: 'settings' });
   const panels = [];
-  panels.push(await simulatorPanel(), await devicesPanel(), await guidePanel(), await contextPanel(), await adminPanel());
+  panels.push(await simulatorPanel(), await devicesPanel(), await clientsPanel(), await contextPanel(), await adminPanel());
 
   // Who we are + how we sell
   const ws = await call('workspace:get');
@@ -322,6 +329,21 @@ async function renderAdmin() {
     h('h1', { class: 'page' }, 'Admin'),
     h('p', { class: 'sub' }, 'Only you see this page. Changes here apply to everyone on the team; Grant and Christian can read team settings but can’t change them.'),
     ...panels);
+}
+
+// Settings for Cue for clients: their account, and a word on who sees what.
+async function clientSettingsPanels() {
+  const u = authState.user || {};
+  const panels = [h('div', { class: 'panel' }, h('h3', {}, 'Your account'),
+    h('div', { class: 'row', style: 'margin-bottom:10px' }, h('span', { class: 'grow' }, `Signed in as ${u.name || u.email} (${u.email})`),
+      h('button', { class: 'btn allow', onclick: async () => { await call('auth:signOut'); authState = await call('auth:state'); renderAccount(); renderNav(); renderFolders(); go({ view: 'home' }); } }, 'Sign out')),
+    h('div', { class: 'hint' }, 'Your recordings and notes are private to you and shared with your Synapse team. Nobody else sees them.'))];
+  if (WEB) return panels;
+  const up = await call('update:state');
+  panels.push(h('div', { class: 'panel' }, h('h3', {}, 'Updates'),
+    h('div', { class: 'hint', style: 'margin-bottom:10px' }, `Cue ${up.current || info.version}. ${up.status === 'current' ? 'You have the latest version.' : up.status === 'ready' ? `Version ${up.latest} is ready.` : up.status === 'available' ? `Version ${up.latest} is available.` : 'Cue updates itself.'}`),
+    up.status === 'ready' ? h('button', { class: 'btn primary allow', onclick: async () => { const r = await call('update:install'); if (!r.ok) alert(r.error); } }, 'Restart to update') : null));
+  return panels;
 }
 
 // ---------------------------------------------------------------------------
@@ -480,6 +502,56 @@ async function contextPanel() {
     slackBox,
     row('Google Drive', st.drive ? !s.drive?.error : false, st.drive ? line('drive') : 'Google Drive for desktop isn’t mirroring “Client Data Exports” on this Mac.'),
     out);
+}
+
+// Admin → Clients: Cue for clients (a note taker). Invite people at a client;
+// each gets a personal code. They only ever see their own calls; the team sees
+// everything they record (in the Clients space).
+const KNOWN_CLIENTS = ['Entech Fabrications', 'APG Sensors', 'FireTech Supplies', 'Klimer Platforms', 'QSD Curtains', 'AuldTech'];
+const orgKeyOf = (name) => String(name || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').trim().split(/\s+/)[0] || '';
+function inviteText({ name, email, code }) {
+  return [`Hi ${String(name || '').split(' ')[0] || 'there'},`, '',
+    'You’re set up on Cue, the meeting note taker we use at Synapse. It records your calls and writes the notes for you, and your Synapse team sees them too.', '',
+    '1. Download it: https://cue.synapsemfg.com/download (choose “I’m a Synapse client”)',
+    '2. Install it (the page shows what to click if your computer warns you)',
+    `3. Sign in with ${email} and this code: ${code}`, '', 'Thanks!'].join('\n');
+}
+async function clientsPanel() {
+  const data = await call('clients:list');
+  const out = h('div', { class: 'test-out' });
+  const name = h('input', { type: 'text', class: 'input', placeholder: 'Name' });
+  const email = h('input', { type: 'email', class: 'input', placeholder: 'name@client.com' });
+  const orgs = [...new Set([...data.orgs.map((o) => o.name), ...KNOWN_CLIENTS])];
+  const company = h('input', { type: 'text', class: 'input', placeholder: 'Company', list: 'client-orgs' });
+  const showInvite = (r, who) => {
+    const text = inviteText({ name: who.name, email: r.email, code: r.code });
+    out.replaceChildren(h('div', { class: 'invite-box' },
+      h('b', {}, `Invite for ${r.email}`), h('pre', {}, text),
+      h('div', { class: 'row', style: 'gap:8px' },
+        h('button', { class: 'btn primary', onclick: (e) => { navigator.clipboard.writeText(text); e.target.textContent = 'Copied'; } }, 'Copy message'),
+        h('a', { class: 'btn', href: `mailto:${encodeURIComponent(r.email)}?subject=${encodeURIComponent('Your Cue invite')}&body=${encodeURIComponent(text)}` }, 'Email it'),
+        h('span', { class: 'grow', style: 'font-size:12px;color:var(--text-3)' }, 'The code is shown only now. “New code” makes another.'))));
+  };
+  const byOrg = new Map();
+  for (const u of data.users) { if (!byOrg.has(u.org_key)) byOrg.set(u.org_key, []); byOrg.get(u.org_key).push(u); }
+  const orgName = (k) => data.orgs.find((o) => o.key === k)?.name || k;
+  const ago = (t) => { if (!t) return 'hasn’t signed in yet'; const d = Math.round((Date.now() - Date.parse(t)) / 86400000); return `signed in ${d <= 0 ? 'today' : `${d} days ago`}`; };
+  return h('div', { class: 'panel' }, h('h3', {}, 'Clients'),
+    h('div', { class: 'hint', style: 'margin-bottom:12px' }, 'Cue for clients is a note taker for people at your clients. They record their own calls and get notes; they only ever see their own calls. Everything they record shows up for the team in the Clients space.'),
+    h('datalist', { id: 'client-orgs' }, orgs.map((o) => h('option', { value: o }))),
+    h('form', { class: 'invite-row', onsubmit: async (e) => {
+      e.preventDefault();
+      if (!email.value.trim() || !company.value.trim()) { out.textContent = 'Add an email and a company.'; return; }
+      const who = { name: name.value.trim(), email: email.value.trim(), orgKey: orgKeyOf(company.value), orgName: company.value.trim() };
+      const r = await call('clients:invite', who);
+      if (!r.ok) { out.textContent = r.error; return; }
+      showInvite(r, who); name.value = ''; email.value = '';
+    } }, name, email, company, h('button', { class: 'btn primary', type: 'submit' }, 'Invite')),
+    out,
+    ...[...byOrg.entries()].map(([k, users]) => h('div', { class: 'client-org' }, h('b', {}, orgName(k)),
+      users.map((u) => h('div', { class: 'ctx-row' }, h('span', { class: `dot ${u.last_sign_in_at ? 'ok' : ''}` }), h('span', { class: 'grow' }, `${u.name || u.email} · ${u.email} · ${ago(u.last_sign_in_at)}`),
+        h('button', { class: 'link-btn', onclick: async () => { const r = await call('clients:invite', { name: u.name, email: u.email, orgKey: u.org_key, orgName: orgName(u.org_key) }); if (r.ok) showInvite(r, u); else out.textContent = r.error; } }, 'New code'),
+        h('button', { class: 'link-btn danger', onclick: async () => { if (!confirm(`Remove ${u.email}? They're signed out and can't sign in again. Their recorded calls stay with the team.`)) return; const r = await call('clients:remove', u.email); if (!r.ok) return alert(r.error); renderView(); } }, 'Remove'))))));
 }
 
 // Admin → Install guide: who can open cue.synapsemfg.com/download.
@@ -759,6 +831,7 @@ function spaceRow(sp) {
   const on = route.view === 'space' && route.id === sp.id;
   const icon = sp.id === 'mine' ? h('span', { class: 'space-ico lock-ico', html: ICON.lock })
     : sp.id === 'team' ? h('img', { class: 'space-ico', src: 'assets/logo.svg', alt: '' })
+    : sp.id === 'clients' ? h('span', { class: 'f-emoji', style: 'font-size:13px;width:15px' }, '🤝')
     : h('button', { class: 'icon-btn-f', type: 'button', title: 'Change icon', onclick: (e) => { e.stopPropagation(); pickerFor = pickerFor === key ? null : key; menuFor = null; renderFolders(); } },
       sp.icon ? h('span', { class: 'f-emoji', style: 'font-size:13px;width:15px' }, sp.icon) : h('span', { class: 'space-letter' }, (sp.name || '?')[0].toUpperCase()));
   const label = renamingSpace === sp.id
@@ -769,8 +842,8 @@ function spaceRow(sp) {
       ? h('button', { class: `chev ${open ? 'open' : ''}`, type: 'button', 'aria-label': open ? 'Collapse' : 'Expand', html: ICON.chev, onclick: (e) => { e.stopPropagation(); open ? collapsed.add(key) : collapsed.delete(key); saveCollapsed(); renderFolders(); } })
       : h('span', { class: 'chev-space' }),
     icon, label,
-    h('button', { class: 'dots', type: 'button', title: 'More', 'aria-label': `More for ${sp.name}`, html: ICON.dots, onclick: (e) => { e.stopPropagation(); menuFor = menuFor === key ? null : key; pickerFor = null; renderFolders(); } }));
-  dropZone(row, () => dropOnSpace(sp.id), (d) => d.kind === 'folder' || sp.id === 'mine' || sp.id === 'team');
+    sp.id === 'clients' ? null : h('button', { class: 'dots', type: 'button', title: 'More', 'aria-label': `More for ${sp.name}`, html: ICON.dots, onclick: (e) => { e.stopPropagation(); menuFor = menuFor === key ? null : key; pickerFor = null; renderFolders(); } }));
+  if (sp.id !== 'clients') dropZone(row, () => dropOnSpace(sp.id), (d) => d.kind === 'folder' || sp.id === 'mine' || sp.id === 'team');
   const out = [h('div', { class: 'folder-wrap' }, row,
     menuFor === key ? spaceMenu(sp) : null,
     pickerFor === key ? iconPicker((icon) => call('spaces:update', { id: sp.id, patch: { icon } })) : null)];
@@ -784,9 +857,9 @@ function spaceRow(sp) {
 async function renderFolders() {
   const el = document.getElementById('folders');
   if (!el) return;
-  if (!authState.user) { el.replaceChildren(); foldersCache = []; spacesCache = []; return; }
+  if (!authState.user || isClientUser()) { el.replaceChildren(); foldersCache = []; spacesCache = []; return; }
   [foldersCache, spacesCache] = await Promise.all([call('folders:list'), call('spaces:list')]);
-  const spaces = [{ id: 'mine', name: 'My notes' }, { id: 'team', name: 'Team' }, ...spacesCache];
+  const spaces = [{ id: 'mine', name: 'My notes' }, { id: 'team', name: 'Team' }, ...spacesCache, { id: 'clients', name: 'Clients', icon: '🤝' }];
   const newSpace = addingSpace ? h('form', { class: 'folder-add', style: 'padding-left:22px', onsubmit: async (e) => {
     e.preventDefault();
     const v = e.target.querySelector('input').value.trim();
@@ -1035,7 +1108,7 @@ function contextMenu(e, items) {
 }
 
 function callContextMenu(e, c) {
-  if (!authState.user) return;
+  if (!authState.user || isClientUser()) return;
   const done = !isLiveNow(c);
   const ids = actionIds(c.id);
   const many = ids.length > 1 ? ` ${ids.length} calls` : '';
@@ -1049,7 +1122,7 @@ function callContextMenu(e, c) {
 
 // Shown on a call row while the mouse is over it.
 function rowActions(c) {
-  if (!authState.user || isLiveNow(c)) return null;
+  if (!authState.user || isClientUser() || isLiveNow(c)) return null;
   const btn = (title, icon, fn) => h('button', { class: 'ra-btn', title, 'aria-label': title, html: ICON[icon],
     onmousedown: (e) => e.stopPropagation(),
     onclick: (e) => { e.stopPropagation(); e.preventDefault(); fn(e); } });

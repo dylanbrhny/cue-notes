@@ -28,6 +28,8 @@ let authState = { configured: false, user: null };
 let teamLive = []; // calls live on the team right now (team.js keeps it fresh)
 // Our side of a call: Synapse addresses plus everyone on the team list (any domain).
 let TEAM_EMAILS = new Set();
+// Cue for clients: a note taker that only shows the client's own calls.
+const isClientUser = () => authState.user?.role === 'client';
 const isOurs = (e) => /@synapsemfg\.com$/i.test(e || '') || TEAM_EMAILS.has(String(e || '').toLowerCase());
 const loadTeamEmails = () => call('team:emails').then((l) => { if (Array.isArray(l) && l.length) TEAM_EMAILS = new Set(l); }).catch(() => {});
 const ICON = {
@@ -129,7 +131,7 @@ async function renderStart() {
   if (menuOpen) {
     const item = (p) => h('button', { onclick: async () => { menuOpen = false; startKey = ''; await call('call:start', { presetId: p.id }); go({ view: 'live' }); } }, p.name);
     kids.push(h('div', { class: 'menu' },
-      h('div', { class: 'menu-label' }, 'Coach me'), presets.filter((p) => p.kind !== 'notes').map(item),
+      presets.some((p) => p.kind !== 'notes') ? h('div', { class: 'menu-label' }, 'Coach me') : null, presets.filter((p) => p.kind !== 'notes').map(item),
       h('div', { class: 'menu-label' }, 'Just take notes'), [...presets.filter((p) => p.kind === 'notes'), ...templates].map(item)));
   }
   $start.replaceChildren(...kids);
@@ -149,6 +151,7 @@ function renderNav() {
     title: n ? `${n} call${n === 1 ? '' : 's'} live now` : 'Nobody is on a call',
     onclick: () => go({ view: 'watch' }),
   }, h('span', { html: ICON.live, style: 'display:inline-grid' }), 'Live', n ? h('span', { class: 'live-count' }, n) : null) : null;
+  if (isClientUser()) { $nav.replaceChildren(item('home', 'Home', 'calls'), item('settings', 'Settings', 'settings')); return; }
   $nav.replaceChildren(item('home', 'Home', 'calls'), live, authState.user ? item('ask', 'Ask Cue', 'sparkle') : null, authState.user ? item('wins', 'What wins', 'trophy') : null, item('presets', 'Presets', 'presets'), item('settings', 'Settings', 'settings'),
     authState.user?.role === 'admin' ? item('admin', 'Admin', 'shield') : null);
 }
@@ -410,9 +413,9 @@ async function renderCall(id) {
     h('button', { class: 'icon-btn', title: 'More', onclick: (e) => { e.stopPropagation(); menuOpenHere = !menuOpenHere; drawMenu(); } }, h('span', { html: ICON.dots, style: 'display:inline-grid;width:16px;height:16px' })),
     menuOpenHere ? h('div', { class: 'pop menu-pop right' },
       menuItem(c.aiNotes ? 'Rewrite notes' : 'Write notes with AI', rewrite),
-      authState.user ? menuItem('Attach files', attach) : null,
-      authState.user && c.status !== 'live' && c.status !== 'writing' ? menuItem(c.archivedAt ? 'Unarchive' : 'Archive', () => archiveCalls([id], !c.archivedAt)) : null,
-      authState.user
+      authState.user && !isClientUser() ? menuItem('Attach files', attach) : null,
+      authState.user && !isClientUser() && c.status !== 'live' && c.status !== 'writing' ? menuItem(c.archivedAt ? 'Unarchive' : 'Archive', () => archiveCalls([id], !c.archivedAt)) : null,
+      isClientUser() ? null : authState.user
         ? menuItem('Delete call', () => trashCalls([id]), true)
         : menuItem('Delete call', async () => { if (!confirm('Delete this call and its notes? This cannot be undone.')) return; await call('calls:delete', id); go({ view: 'home' }); }, true)) : null);
   drawMenu();
@@ -453,10 +456,10 @@ async function renderCall(id) {
   const page = h('div', { class: 'call-page' },
     h('div', { class: 'call-top' },
       h('span', { class: 'grow' }),
-      folderPicker(c),
-      outcomePicker(c),
-      privacyToggle(c),
-      shareBtn,
+      isClientUser() ? null : folderPicker(c),
+      isClientUser() ? null : outcomePicker(c),
+      isClientUser() ? null : privacyToggle(c),
+      isClientUser() ? null : shareBtn,
       menuWrap),
     shareBox,
     h('input', { class: 'title-input', value: c.title || '', placeholder: 'Untitled call', oninput: (e) => saveTitle(e.target.value) }),
@@ -468,7 +471,7 @@ async function renderCall(id) {
     beatsBox,
     body,
     filesRow,
-    authState.user && c.status !== 'live' && c.status !== 'writing' ? h('div', { class: 'ask-dock' }, askPanel({ callId: c.id, compact: true, dock: true })) : null);
+    authState.user && !isClientUser() && c.status !== 'live' && c.status !== 'writing' ? h('div', { class: 'ask-dock' }, askPanel({ callId: c.id, compact: true, dock: true })) : null);
   page.addEventListener('dragover', (e) => { if (authState.user && e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { e.preventDefault(); page.classList.add('drop'); } });
   page.addEventListener('dragleave', (e) => { if (e.target === page) page.classList.remove('drop'); });
   page.addEventListener('drop', async (e) => {
@@ -489,7 +492,7 @@ let presetEditing = null;
 
 // Teammates can read the presets; only the admin edits them.
 async function renderPresets() {
-  const locked = !!authState.user && authState.user.role !== 'admin';
+  const locked = !!authState.user && authState.user.role === 'member';
   if (locked && presetEditing === '__ai') presetEditing = null;
   await renderPresetsInner();
   if (!locked) return;
@@ -737,11 +740,11 @@ async function renderSettings() {
   });
   const mod = info.platform === 'darwin' ? 'Cmd' : 'Ctrl';
 
-  const team = await teamSettingsPanels(s);
-  const locked = !!authState.user && authState.user.role !== 'admin';
+  const team = isClientUser() ? await clientSettingsPanels() : await teamSettingsPanels(s);
+  const locked = !!authState.user && authState.user.role === 'member';
   $view.replaceChildren(
     h('h1', { class: 'page' }, 'Settings'),
-    h('p', { class: 'sub' }, WEB ? 'Cue on the web: everything except recording calls. Recording, the call widget and audio live in the desktop app.' : 'Keys are stored encrypted on this computer and only sent to ElevenLabs and Anthropic.'),
+    h('p', { class: 'sub' }, isClientUser() ? 'Your account and how Cue listens to your calls.' : WEB ? 'Cue on the web: everything except recording calls. Recording, the call widget and audio live in the desktop app.' : 'Keys are stored encrypted on this computer and only sent to ElevenLabs and Anthropic.'),
     locked ? h('div', { class: 'banner' }, 'Only Dylan can change Cue’s settings. You can pick your own theme.') : null,
     authState.user?.role === 'admin' ? h('button', { class: 'banner banner-link', onclick: () => go({ view: 'admin' }) },
       h('span', { html: ICON.shield, style: 'display:inline-grid;width:16px;height:16px' }),
@@ -756,7 +759,7 @@ async function renderSettings() {
         h('span', { class: 'sw', style: `background:${bg}` }, h('i', { style: `width:38%;background:${dots[0]}` }), h('i', { style: `width:18%;background:${dots[1]}` })),
         label)))),
     ...team,
-    authState.user?.role === 'admin' ? null : await keysPanel(s, keyInput, save, out),
+    authState.user?.role === 'admin' || isClientUser() ? null : await keysPanel(s, keyInput, save, out),
     WEB ? null : h('div', { class: 'panel' }, h('h3', {}, 'Audio'),
       field('Microphone', micSelect),
       field('Language', h('select', { onchange: (e) => save({ language: e.target.value }) },
@@ -784,7 +787,7 @@ async function renderSettings() {
         h('span', { class: 'grow', style: 'font-size:12.5px;color:var(--text-3)' }, info.windowAccess ? 'Meeting windows: watching (Accessibility allowed)' : 'Meeting windows: off. Allow Cue under Accessibility so a meeting is spotted even with your mic muted.'),
         info.windowAccess ? null : h('button', { class: 'btn allow', onclick: () => call('app:openAxSettings') }, 'Open Settings')) : null,
       toggle('autoStart', 'Start cues without asking', 'Skips the "Call detected" card and uses the default preset.'),
-      field('Default preset', h('select', { onchange: (e) => save({ defaultPresetId: e.target.value }) },
+      isClientUser() ? null : field('Default preset', h('select', { onchange: (e) => save({ defaultPresetId: e.target.value }) },
         presets.map((p) => h('option', { value: p.id, selected: p.id === s.defaultPresetId }, p.name))))),
     WEB ? null : h('div', { class: 'panel' }, h('h3', {}, 'Cue card'),
       h('div', { class: 'hint', style: 'margin-bottom:8px;font-size:12.5px;color:var(--text-3)' }, 'Drag it anywhere on the screen; it remembers the spot. It is hidden from screen shares.'),

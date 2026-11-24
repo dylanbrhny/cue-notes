@@ -94,7 +94,7 @@ function callRows(meetings, { showOwner = true } = {}) {
         sub ? h('span', { class: 'ci-sub' }, sub) : null),
       h('span', { class: 'ci-time' }, timeOf(c.startedAt)),
       rowActions(c));
-    if (authState.user) makeDraggable(row, 'call', c.id);
+    if (authState.user && !isClientUser()) makeDraggable(row, 'call', c.id);
     out.push(row);
   }
   return out;
@@ -193,9 +193,10 @@ async function renderNotesTab() {
     }, 250);
   };
   draw('');
-  const [nudge, soon, liveNow] = await Promise.all([WEB ? null : calendarNudge(), comingUp(), liveNowSection()]);
+  const client = isClientUser();
+  const [nudge, soon, liveNow] = client ? [null, null, null] : await Promise.all([WEB ? null : calendarNudge(), comingUp(), liveNowSection()]);
   if (route.view !== 'home') return; // the user moved on while this loaded
-  $view.replaceChildren(tabBar('home'), demoCard(), liveNow, nudge, soon,
+  $view.replaceChildren(client ? h('h1', { class: 'page' }, 'Your calls') : tabBar('home'), client ? null : demoCard(), liveNow, nudge, soon,
     h('div', { class: 'row tab-tools' }, searchBox('Search titles, people, notes and transcripts', draw)),
     list);
 }
@@ -357,12 +358,12 @@ function callFilesSection(c) {
 // ---------------------------------------------------------------------------
 
 async function renderSpace(id) {
-  if (!spacesCache.length && id !== 'mine' && id !== 'team') spacesCache = await call('spaces:list');
-  const sp = id === 'mine' ? { id, name: 'My notes' } : id === 'team' ? { id, name: 'Team' } : spacesCache.find((x) => x.id === id);
+  if (!spacesCache.length && id !== 'mine' && id !== 'team' && id !== 'clients') spacesCache = await call('spaces:list');
+  const sp = id === 'mine' ? { id, name: 'My notes' } : id === 'team' ? { id, name: 'Team' } : id === 'clients' ? { id, name: 'Clients' } : spacesCache.find((x) => x.id === id);
   if (!sp) return go({ view: 'home' });
   const folders = typeof topFolders === 'function' ? topFolders(id) : [];
-  const meetings = id === 'mine' || id === 'team' ? await call('spaces:meetings', id) : [];
-  const sub = id === 'mine' ? 'Only you can see these: calls you recorded and your private folders.' : id === 'team' ? 'Shared with the whole team.' : 'A shared space for its own folders.';
+  const meetings = id === 'mine' || id === 'team' || id === 'clients' ? await call('spaces:meetings', id) : [];
+  const sub = id === 'mine' ? 'Only you can see these: calls you recorded and your private folders.' : id === 'team' ? 'Shared with the whole team.' : id === 'clients' ? 'Calls recorded by people at your clients with Cue for clients. Each client only sees their own.' : 'A shared space for its own folders.';
   $view.replaceChildren(
     h('div', { class: 'folder-head' },
       h('span', { class: 'big-icon' }, id === 'mine' ? h('span', { class: 'lock-ico big', html: ICON.lock }) : id === 'team' ? h('img', { src: 'assets/logo.svg', style: 'width:30px;height:30px;border-radius:8px' }) : (sp.icon || h('span', { class: 'space-letter big' }, sp.name[0].toUpperCase()))),
