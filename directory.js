@@ -52,9 +52,46 @@ async function loadCompanyNames() {
   if (companyNames.size || !authState.user) return;
   try { companyNames = new Map((await call('companies:list')).map((c) => [c.domain, c.name])); } catch {}
 }
+// A call with no outside email on it (a phone call, a typed title, an imported note) still
+// gets its company, and so its logo: the company is found by name in the call's title or
+// its folder ("Harbor Sensors weekly", the "Harbor Sensors" folder), among the companies
+// the team has met. Words are compared loosely ("Sensor" matches "Sensors"; Inc/LLC ignored).
+const NAME_SKIP = new Set(['inc', 'llc', 'ltd', 'co', 'corp', 'corporation', 'company', 'group', 'the', 'and', 'of', 'llp', 'plc']);
+const looseWords = (t) => String(t || '').toLowerCase().replace(/&/g, ' and ').split(/[^a-z0-9]+/).filter((w) => w && !NAME_SKIP.has(w)).map((w) => (w.length > 3 ? w.replace(/s$/, '') : w));
+let nameIndex = { size: -1, list: [] };
+function companyNameIndex() {
+  if (nameIndex.size === companyNames.size) return nameIndex.list;
+  const list = [];
+  for (const [domain, name] of companyNames) {
+    if (!domain || isOurs(`x@${domain}`)) continue;
+    const words = looseWords(name);
+    const key = words.join(' ');
+    const root = String(domain).split('.')[0].toLowerCase();
+    if (key.replace(/ /g, '').length >= 4) list.push({ domain, key: ` ${key} ` });
+    if (root.length >= 5 && root !== key.replace(/ /g, '')) list.push({ domain, squash: root });
+  }
+  list.sort((a, b) => (b.key || b.squash).length - (a.key || a.squash).length); // the longest (most specific) name wins
+  nameIndex = { size: companyNames.size, list };
+  return list;
+}
+function companyFromText(c) {
+  if (!companyNames.size) return null;
+  const folder = typeof foldersCache !== 'undefined' && c.folderId ? (foldersCache.find((f) => f.id === c.folderId)?.name || '') : '';
+  const words = looseWords(`${c.title || ''} ${folder}`);
+  const spaced = ` ${words.join(' ')} `;
+  const squashed = words.join('');
+  const hit = companyNameIndex().find((e) => (e.key ? spaced.includes(e.key) : squashed.includes(e.squash)));
+  return hit ? hit.domain : null;
+}
+
 function callWho(c) {
   const outside = (Array.isArray(c.attendees) ? c.attendees : []).filter((a) => a && typeof a.email === 'string' && a.email.includes('@') && !isOurs(a.email));
-  const domain = outside.map((a) => a.email.split('@')[1].toLowerCase()).find((d) => d && !PERSONAL.test(d)) || null;
+  // The main outside company: the work domain most of the other side came from (free mail
+  // like Gmail and our own domains don't count); without one, the company named in the
+  // title or folder. Its favicon becomes the call's icon.
+  const counts = new Map();
+  for (const a of outside) { const d = a.email.split('@')[1].toLowerCase(); if (d && !PERSONAL.test(d)) counts.set(d, (counts.get(d) || 0) + 1); }
+  const domain = [...counts].sort((x, y) => y[1] - x[1])[0]?.[0] || companyFromText(c);
   const company = domain ? (companyNames.get(domain) || domain.split('.')[0].replace(/^./, (x) => x.toUpperCase())) : null;
   const people = outside.map((a) => a.name || a.email.split('@')[0]).filter(Boolean);
   return { domain, company, people };
@@ -72,6 +109,16 @@ function callAvatar(c, who) {
   if (who.domain) return companyLogo(who.domain, who.company, 30);
   const letter = (who.people[0] || '').trim()[0];
   return h('span', { class: 'ent-ico neutral', style: 'width:30px;height:30px' }, letter ? letter.toUpperCase() : h('span', { html: ICON.calls, style: 'display:inline-grid;width:14px;height:14px' }));
+}
+
+// A person shows their company's favicon (from their work email); free mail and our own
+// team show their initial.
+function personIcon(p, size) {
+  const email = String(p.email || '').toLowerCase();
+  const domain = String(p.domain || email.split('@')[1] || '').toLowerCase();
+  // No favicon: their own initial, not the company's.
+  if (domain && !PERSONAL.test(domain) && !isOurs(email || `x@${domain}`)) return companyLogo(domain, p.name || email, size);
+  return h('span', { class: `avatar ${size > 30 ? 'big' : ''}` }, (p.name || email || '?')[0].toUpperCase());
 }
 
 function callRows(meetings, { showOwner = true } = {}) {
@@ -170,40 +217,92 @@ async function comingUp() {
     }));
 }
 
-async function renderNotesTab() {
+// Home's tabs (Notes, Companies, People, Files) open at once with what they showed last
+// time, then quietly redraw if anything changed (like Notion). The other tabs' lists are
+// fetched in the background while you're on Notes, so even the first switch is instant.
+const tabMemo = new Map(); // view -> { data, sig }
+function keepSearch(paint) {
+  const box = $view.querySelector('.tab-tools .search');
+  const q = box ? box.value : '';
+  const focused = !!box && document.activeElement === box;
+  const pos = box ? box.selectionStart : 0;
+  paint();
+  if (!q && !focused) return;
+  const next = $view.querySelector('.tab-tools .search');
+  if (!next) return;
+  next.value = q;
+  if (q) next.dispatchEvent(new Event('input', { bubbles: true }));
+  if (focused) { next.focus(); try { next.setSelectionRange(pos, pos); } catch {} }
+}
+async function instantTab(view, load, paint, sign = (d) => JSON.stringify(d)) {
   const fresh = pageTicket();
-  const [all] = await Promise.all([call('calls:list'), loadCompanyNames()]);
-  const list = h('div', { class: 'folder-list' });
-  let searchSeq = 0;
-  // Snippets come back with <b>…</b> around matches; everything else is escaped.
-  const snippetEl = (s) => h('span', { class: 'snippet', html: esc(String(s).replace(/[#*_`>]+/g, '').replace(/\s*\n\s*-?\s*/g, ' · ').replace(/^ · /, '')).replace(/&lt;b&gt;/g, '<mark>').replace(/&lt;\/b&gt;/g, '</mark>') });
-  const draw = (q) => {
-    const byTitle = all.filter((c) => match(q, c.title, c.owner, c.presetName));
-    list.replaceChildren(...(byTitle.length ? callRows(byTitle) : [h('div', { class: 'placeholder' }, q ? 'Searching notes and transcripts…' : 'No calls yet.')]));
-    if (!q || q.length < 3 || !authState.user) { if (q && !byTitle.length) list.replaceChildren(h('div', { class: 'placeholder' }, 'No calls match.')); return; }
-    const seq = ++searchSeq;
-    setTimeout(async () => {
-      if (seq !== searchSeq) return;
-      const hits = (await call('calls:search', q)).filter((m) => !byTitle.some((c) => c.id === m.id));
-      if (seq !== searchSeq) return;
-      const rows = byTitle.length ? callRows(byTitle) : [];
-      if (hits.length) {
-        rows.push(h('div', { class: 'group', style: 'padding-left:0' }, `Mentioned in ${hits.length} call${hits.length === 1 ? '' : 's'}`));
-        for (const m of hits) rows.push(h('button', { class: 'folder-call', onclick: () => go({ view: 'call', id: m.id }) },
-          h('span', { class: 'grow' }, h('b', {}, m.title || 'Untitled call'),
-            h('span', {}, [m.owner, `${dayLabel(m.startedAt)} ${timeOf(m.startedAt)}`].filter(Boolean).join(' · ')),
-            m.snippet ? snippetEl(m.snippet) : null)));
-      }
-      list.replaceChildren(...(rows.length ? rows : [h('div', { class: 'placeholder' }, 'No calls match.')]));
-    }, 250);
-  };
-  draw('');
+  const memo = tabMemo.get(view);
+  // Only when arriving from another page: a refresh of the page on screen just redraws if changed.
+  if (memo && pageEnter) paint(memo.data);
+  let data;
+  try { data = await load(); } catch { data = null; }
+  if (!fresh()) return;
+  if (data == null) { if (!memo) paint(null); return; }
+  const sig = sign(data);
+  tabMemo.set(view, { data, sig });
+  if (memo && memo.sig === sig && $view.dataset.view === view) return; // what's on screen is already current
+  keepSearch(() => paint(data));
+}
+const TAB_LOAD = {
+  companies: async () => (await call('companies:list')).sort((a, b) => new Date(b.last_met) - new Date(a.last_met)),
+  people: async () => (await call('people:list')).sort((a, b) => new Date(b.last_met) - new Date(a.last_met)),
+  files: () => call('files:list'),
+};
+let warming = false;
+function warmTabs() {
+  if (warming || !authState.user || isClientUser()) return;
+  warming = true;
+  Promise.all(Object.entries(TAB_LOAD).filter(([v]) => !tabMemo.has(v)).map(([v, load]) => load().then((d) => {
+    if (d && !tabMemo.has(v)) tabMemo.set(v, { data: d, sig: JSON.stringify(d) });
+  }).catch(() => {}))).finally(() => { warming = false; });
+}
+
+async function renderNotesTab() {
   const client = isClientUser();
-  const [nudge, soon, liveNow] = client ? [null, null, null] : await Promise.all([WEB ? null : calendarNudge(), comingUp(), liveNowSection()]);
-  if (!fresh()) return; // the user moved on while this loaded
-  $view.replaceChildren(client ? h('h1', { class: 'page' }, 'Your calls') : tabBar('home'), client ? null : demoCard(), liveNow, nudge, soon,
-    h('div', { class: 'row tab-tools' }, searchBox('Search titles, people, notes and transcripts', draw)),
-    list);
+  const load = async () => {
+    const [all, , nudge, soon, liveNow] = await Promise.all([call('calls:list'), loadCompanyNames(),
+      client || WEB ? null : calendarNudge(), client ? null : comingUp(), client ? null : liveNowSection()]);
+    return { all, nudge, soon, liveNow };
+  };
+  const sign = (d) => JSON.stringify(d.all) + [d.nudge, d.soon, d.liveNow].map((n) => n?.outerHTML || '').join('|');
+  await instantTab('home', load, (d) => {
+    if (!d) d = { all: [] };
+    const all = d.all || [];
+    const list = h('div', { class: 'folder-list' });
+    let searchSeq = 0;
+    // Snippets come back with <b>…</b> around matches; everything else is escaped.
+    const snippetEl = (sn) => h('span', { class: 'snippet', html: esc(String(sn).replace(/[#*_`>]+/g, '').replace(/\s*\n\s*-?\s*/g, ' · ').replace(/^ · /, '')).replace(/&lt;b&gt;/g, '<mark>').replace(/&lt;\/b&gt;/g, '</mark>') });
+    const draw = (q) => {
+      const byTitle = all.filter((c) => match(q, c.title, c.owner, c.presetName));
+      list.replaceChildren(...(byTitle.length ? callRows(byTitle) : [h('div', { class: 'placeholder' }, q ? 'Searching notes and transcripts…' : 'No calls yet.')]));
+      if (!q || q.length < 3 || !authState.user) { if (q && !byTitle.length) list.replaceChildren(h('div', { class: 'placeholder' }, 'No calls match.')); return; }
+      const seq = ++searchSeq;
+      setTimeout(async () => {
+        if (seq !== searchSeq) return;
+        const hits = (await call('calls:search', q)).filter((m) => !byTitle.some((c) => c.id === m.id));
+        if (seq !== searchSeq) return;
+        const rows = byTitle.length ? callRows(byTitle) : [];
+        if (hits.length) {
+          rows.push(h('div', { class: 'group', style: 'padding-left:0' }, `Mentioned in ${hits.length} call${hits.length === 1 ? '' : 's'}`));
+          for (const m of hits) rows.push(h('button', { class: 'folder-call', onclick: () => go({ view: 'call', id: m.id }) },
+            h('span', { class: 'grow' }, h('b', {}, m.title || 'Untitled call'),
+              h('span', {}, [m.owner, `${dayLabel(m.startedAt)} ${timeOf(m.startedAt)}`].filter(Boolean).join(' · ')),
+              m.snippet ? snippetEl(m.snippet) : null)));
+        }
+        list.replaceChildren(...(rows.length ? rows : [h('div', { class: 'placeholder' }, 'No calls match.')]));
+      }, 250);
+    };
+    draw('');
+    $view.replaceChildren(client ? h('h1', { class: 'page' }, 'Your calls') : tabBar('home'), client ? null : demoCard(), d.liveNow || null, d.nudge || null, d.soon || null,
+      h('div', { class: 'row tab-tools' }, searchBox('Search titles, people, notes and transcripts', draw)),
+      list);
+  }, sign);
+  setTimeout(warmTabs, 300); // the other tabs' lists, so switching to them is instant
 }
 
 // ---------------------------------------------------------------------------
@@ -211,24 +310,24 @@ async function renderNotesTab() {
 // ---------------------------------------------------------------------------
 
 async function renderCompanies() {
-  const fresh = pageTicket();
-  if (!authState.user) return $view.replaceChildren(tabBar('companies'), h('div', { class: 'placeholder' }, 'Sign in to see companies.'));
-  const all = (await call('companies:list')).sort((a, b) => new Date(b.last_met) - new Date(a.last_met));
-  const body = h('tbody');
-  const draw = (q) => body.replaceChildren(...all.filter((c) => match(q, c.name, c.domain)).map((c) => h('tr', { onclick: () => go({ view: 'company', id: c.domain }) },
-    h('td', {}, h('div', { class: 'ent' }, companyLogo(c.domain, c.name), h('span', {}, h('b', {}, c.name), h('small', {}, c.domain)))),
-    h('td', { class: 'num' }, c.people), h('td', { class: 'num' }, c.meetings), h('td', { class: 'dim' }, ago(c.last_met)))));
-  draw('');
-  const tidy = h('button', { class: 'link-btn', onclick: async () => {
-    tidy.textContent = 'Naming…'; tidy.disabled = true;
-    const r = await call('companies:aiNames');
-    if (!r.ok) alert(r.error);
-    renderCompanies();
-  } }, h('span', { html: ICON.sparkle, style: 'display:inline-grid;width:13px;height:13px;vertical-align:-2px;margin-right:4px' }), 'Tidy names with AI');
-  if (!fresh()) return;
-  $view.replaceChildren(tabBar('companies'),
-    h('div', { class: 'row tab-tools' }, searchBox('Search companies', draw), h('span', { class: 'saved' }, `${all.length} companies`), tidy),
-    h('table', { class: 'ent-table' }, h('thead', {}, h('tr', {}, h('th', {}, 'Company'), h('th', { class: 'num' }, 'People'), h('th', { class: 'num' }, 'Meetings'), h('th', {}, 'Last met'))), body));
+  if (!authState.user) { pageTicket(); return $view.replaceChildren(tabBar('companies'), h('div', { class: 'placeholder' }, 'Sign in to see companies.')); }
+  return instantTab('companies', TAB_LOAD.companies, (all) => {
+    all = all || [];
+    const body = h('tbody');
+    const draw = (q) => body.replaceChildren(...all.filter((c) => match(q, c.name, c.domain)).map((c) => h('tr', { onclick: () => go({ view: 'company', id: c.domain }) },
+      h('td', {}, h('div', { class: 'ent' }, companyLogo(c.domain, c.name), h('span', {}, h('b', {}, c.name), h('small', {}, c.domain)))),
+      h('td', { class: 'num' }, c.people), h('td', { class: 'num' }, c.meetings), h('td', { class: 'dim' }, ago(c.last_met)))));
+    draw('');
+    const tidy = h('button', { class: 'link-btn', onclick: async () => {
+      tidy.textContent = 'Naming…'; tidy.disabled = true;
+      const r = await call('companies:aiNames');
+      if (!r.ok) alert(r.error);
+      renderCompanies();
+    } }, h('span', { html: ICON.sparkle, style: 'display:inline-grid;width:13px;height:13px;vertical-align:-2px;margin-right:4px' }), 'Tidy names with AI');
+    $view.replaceChildren(tabBar('companies'),
+      h('div', { class: 'row tab-tools' }, searchBox('Search companies', draw), h('span', { class: 'saved' }, `${all.length} companies`), tidy),
+      h('table', { class: 'ent-table' }, h('thead', {}, h('tr', {}, h('th', {}, 'Company'), h('th', { class: 'num' }, 'People'), h('th', { class: 'num' }, 'Meetings'), h('th', {}, 'Last met'))), body));
+  });
 }
 
 async function renderCompany(domain) {
@@ -258,19 +357,19 @@ async function renderCompany(domain) {
 // ---------------------------------------------------------------------------
 
 async function renderPeople() {
-  const fresh = pageTicket();
-  if (!authState.user) return $view.replaceChildren(tabBar('people'), h('div', { class: 'placeholder' }, 'Sign in to see people.'));
-  const all = (await call('people:list')).sort((a, b) => new Date(b.last_met) - new Date(a.last_met));
-  const body = h('tbody');
-  const draw = (q) => body.replaceChildren(...all.filter((p) => match(q, p.name, p.email, p.company)).map((p) => h('tr', { onclick: () => go({ view: 'person', id: p.email }) },
-    h('td', {}, h('div', { class: 'ent' }, h('span', { class: 'avatar' }, (p.name || p.email)[0].toUpperCase()), h('span', {}, h('b', {}, p.name), p.title ? h('small', {}, p.title) : null))),
-    h('td', {}, p.company ? h('span', { class: 'co-cell', onclick: (e) => { e.stopPropagation(); go({ view: 'company', id: p.domain }); } }, companyLogo(p.domain, p.company, 18), h('span', { class: 'link-like' }, p.company)) : h('span', { class: 'dim' }, '—')),
-    h('td', { class: 'dim' }, p.email), h('td', { class: 'num' }, p.meetings), h('td', { class: 'dim' }, ago(p.last_met)))));
-  draw('');
-  if (!fresh()) return;
-  $view.replaceChildren(tabBar('people'),
-    h('div', { class: 'row tab-tools' }, searchBox('Search people, emails or companies', draw), h('span', { class: 'saved' }, `${all.length} people`)),
-    h('table', { class: 'ent-table' }, h('thead', {}, h('tr', {}, h('th', {}, 'Person'), h('th', {}, 'Company'), h('th', {}, 'Email'), h('th', { class: 'num' }, 'Meetings'), h('th', {}, 'Last met'))), body));
+  if (!authState.user) { pageTicket(); return $view.replaceChildren(tabBar('people'), h('div', { class: 'placeholder' }, 'Sign in to see people.')); }
+  return instantTab('people', TAB_LOAD.people, (all) => {
+    all = all || [];
+    const body = h('tbody');
+    const draw = (q) => body.replaceChildren(...all.filter((p) => match(q, p.name, p.email, p.company)).map((p) => h('tr', { onclick: () => go({ view: 'person', id: p.email }) },
+      h('td', {}, h('div', { class: 'ent' }, personIcon(p, 26), h('span', {}, h('b', {}, p.name), p.title ? h('small', {}, p.title) : null))),
+      h('td', {}, p.company ? h('span', { class: 'co-cell', onclick: (e) => { e.stopPropagation(); go({ view: 'company', id: p.domain }); } }, h('span', { class: 'link-like' }, p.company)) : h('span', { class: 'dim' }, '—')),
+      h('td', { class: 'dim' }, p.email), h('td', { class: 'num' }, p.meetings), h('td', { class: 'dim' }, ago(p.last_met)))));
+    draw('');
+    $view.replaceChildren(tabBar('people'),
+      h('div', { class: 'row tab-tools' }, searchBox('Search people, emails or companies', draw), h('span', { class: 'saved' }, `${all.length} people`)),
+      h('table', { class: 'ent-table' }, h('thead', {}, h('tr', {}, h('th', {}, 'Person'), h('th', {}, 'Company'), h('th', {}, 'Email'), h('th', { class: 'num' }, 'Meetings'), h('th', {}, 'Last met'))), body));
+  });
 }
 
 async function renderPerson(email) {
@@ -285,7 +384,7 @@ async function renderPerson(email) {
   const saveNotes = debounce((v) => save({ notes: v }), 500);
   $view.replaceChildren(
     h('button', { class: 'link-btn back', onclick: () => go({ view: 'people' }) }, '‹ People'),
-    h('div', { class: 'folder-head' }, h('span', { class: 'avatar big' }, (p.name || email)[0].toUpperCase()),
+    h('div', { class: 'folder-head' }, personIcon({ ...p, email }, 44),
       h('input', { class: 'title-input', value: p.name || '', placeholder: 'Name', oninput: (e) => saveName(e.target.value) })),
     h('div', { class: 'meta', style: 'margin:-10px 0 18px' },
       h('input', { class: 'inline-input', value: p.title || '', placeholder: 'Add a title (e.g. Owner)', oninput: (e) => saveTitle(e.target.value) }),
@@ -325,17 +424,17 @@ function fileRows(files, { showCall = true, onChange } = {}) {
 }
 
 async function renderFiles() {
-  const fresh = pageTicket();
-  if (!authState.user) return $view.replaceChildren(tabBar('files'), h('div', { class: 'placeholder' }, 'Sign in to see files.'));
-  const all = await call('files:list');
-  const list = h('div', { class: 'file-list' });
-  const draw = (q) => {
-    const shown = all.filter((f) => match(q, f.name, f.meetingTitle, f.uploader));
-    list.replaceChildren(...(shown.length ? fileRows(shown, { onChange: renderFiles }) : [h('div', { class: 'placeholder' }, all.length ? 'No files match.' : 'No files yet. Attach files to a call (open the call, then "Attach files" or drop them on it).')]));
-  };
-  draw('');
-  if (!fresh()) return;
-  $view.replaceChildren(tabBar('files'), h('div', { class: 'row tab-tools' }, searchBox('Search files', draw), h('span', { class: 'saved' }, `${all.length} files`)), list);
+  if (!authState.user) { pageTicket(); return $view.replaceChildren(tabBar('files'), h('div', { class: 'placeholder' }, 'Sign in to see files.')); }
+  return instantTab('files', TAB_LOAD.files, (all) => {
+    all = all || [];
+    const list = h('div', { class: 'file-list' });
+    const draw = (q) => {
+      const shown = all.filter((f) => match(q, f.name, f.meetingTitle, f.uploader));
+      list.replaceChildren(...(shown.length ? fileRows(shown, { onChange: renderFiles }) : [h('div', { class: 'placeholder' }, all.length ? 'No files match.' : 'No files yet. Attach files to a call (open the call, then "Attach files" or drop them on it).')]));
+    };
+    draw('');
+    $view.replaceChildren(tabBar('files'), h('div', { class: 'row tab-tools' }, searchBox('Search files', draw), h('span', { class: 'saved' }, `${all.length} files`)), list);
+  });
 }
 
 // Files section on a call page (attach button + drop anywhere on the page).

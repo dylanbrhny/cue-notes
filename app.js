@@ -226,14 +226,16 @@ const pageTicket = () => { const n = pageSeq; return () => n === pageSeq; };
 // the same moment. Doing either on the old page while the new one loaded made the old
 // tab play again before the new one showed.
 let pageEnter = null; // set while a new page is on its way
+const SIBLING_TABS = ['home', 'companies', 'people', 'files'];
 new MutationObserver(() => {
   if (!pageEnter) return;
   const kids = [...$view.children];
   if (!kids.length) return;
   if (pageEnter.scroll) { document.getElementById('main').scrollTop = 0; pageEnter.scroll = false; }
   if (kids.every((k) => k.classList.contains('placeholder'))) return; // still loading: rise with the content
+  const still = pageEnter.still;
   pageEnter = null;
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (still || matchMedia('(prefers-reduced-motion: reduce)').matches) return; // Home's own tabs swap without the rise
   for (const k of kids) k.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 200, easing: 'ease', fill: 'backwards' });
 }).observe($view, { childList: true });
 
@@ -274,7 +276,8 @@ async function renderView() {
   // The saved sign-in is still loading: don't flash the sign-in page.
   if (authState.restoring && v !== 'signin') { $view.replaceChildren(h('div', { class: 'placeholder' }, h('span', { class: 'spin' }), 'Opening Cue…')); return; }
   if (deviceBlocked() && v !== 'signin') return renderWaiting();
-  if ($view.dataset.view !== v || $view.dataset.id !== String(route.id || '')) pageEnter = { scroll: true };
+  // Moving between Home's tabs (Notes, Companies, People, Files) is a plain swap; other pages rise in.
+  if ($view.dataset.view !== v || $view.dataset.id !== String(route.id || '')) pageEnter = { scroll: true, still: SIBLING_TABS.includes(v) && SIBLING_TABS.includes($view.dataset.view) };
   $view.dataset.view = v;
   $view.dataset.id = String(route.id || '');
   if (v === 'live') { const fresh = pageTicket(); liveState = await call('call:state'); if (!fresh()) return; renderList(); return renderLive(true); }
@@ -929,7 +932,7 @@ window.cue.on('calls:changed', async (p) => {
   if (c && route.view === 'call' && route.id === id && c.status !== $view.dataset.status) renderCall(id);
 });
 window.cue.on('team:changed', () => { renderList(); renderTeamLive(); });
-window.cue.on('auth:changed', async () => { authState = await call('auth:state'); loadTeamEmails(); renderAccount(); renderNav(); renderTeamLive(); renderFolders(); presetsChanged(); renderView(); });
+window.cue.on('auth:changed', async () => { if (typeof tabMemo !== 'undefined') tabMemo.clear(); authState = await call('auth:state'); loadTeamEmails(); renderAccount(); renderNav(); renderTeamLive(); renderFolders(); presetsChanged(); renderView(); });
 window.cue.on('computers:changed', () => { if (route.view === 'settings' || route.view === 'admin') renderView(); });
 window.cue.on('monitor:event', (e) => onMonitorEvent(e));
 window.cue.on('settings:changed', (s) => { applyTheme(s.theme); if (route.view === 'settings') renderSettings(); });
