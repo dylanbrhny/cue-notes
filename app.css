@@ -462,7 +462,7 @@ body.selecting { user-select: none; }
 .meta-link { border: 0; background: transparent; padding: 0; color: var(--text-3); font: inherit; text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; cursor: pointer; }
 .meta-link:hover { color: var(--text); }
 .meta-warn { color: var(--amber, #c98a2b); }
-.beats { margin: -10px 0 22px; padding: 10px 14px; border-radius: 10px; background: var(--bg-sunk); }
+.beats { margin: -10px 0 22px; padding: 10px 14px; border-radius: 10px; background: var(--bg-sunk); border: 1px solid var(--line); }
 .beats .checks { margin: 0; }
 .beats-obj { margin-top: 8px; font-size: 12.5px; color: var(--text-3); display: grid; gap: 4px; }
 .beats-obj b { color: var(--text-2); }
@@ -478,6 +478,35 @@ body.selecting { user-select: none; }
 .ask.dock .ask-log { max-height: 45vh; overflow-y: auto; }
 .call-top .chip-select { width: auto; max-width: 240px; field-sizing: content; padding-right: 22px; }
 .ask.dock .ask-bar .btn { display: none; }
+/* The docked chat opens in its own panel: tinted, bordered and lifted off the notes, with a header and a close button */
+.ask-panel { margin-bottom: 10px; border: 1px solid var(--line-2); border-radius: 14px; background: color-mix(in srgb, var(--text) 4%, var(--bg)); box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.22), 0 2px 8px rgba(0, 0, 0, 0.06); overflow: hidden; animation: ask-in 0.16s ease-out; }
+.ask-panel[hidden], .ask-reopen-row[hidden] { display: none; }
+@keyframes ask-in { from { opacity: 0; transform: translateY(6px); } }
+.ask-head { display: flex; align-items: center; gap: 6px; padding: 7px 7px 7px 14px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--text) 6%, var(--bg)); }
+.ask-head .grow { flex: 1; }
+.ask-title { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: var(--text); min-width: 0; }
+.ask-scope { font-weight: 400; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ask-ic { display: grid; place-items: center; color: var(--accent); }
+.ask-ic svg { width: 14px; height: 14px; }
+.ask-close { color: var(--text-2); }
+.ask-close svg { width: 16px; height: 16px; }
+.ask.dock .ask-panel .ask-log { padding: 12px 14px 14px; max-height: 45vh; }
+.ask-panel .ask-q { background: var(--accent-bg); color: var(--text); }
+.ask-panel .ask-a { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04); }
+.ask.dock.open .ask-input { border-color: var(--line-2); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06); }
+.ask-reopen-row { display: flex; justify-content: center; margin-bottom: 8px; }
+.ask-reopen { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-2); background: var(--card); color: var(--text-2); font: inherit; font-size: 12.5px; padding: 4px 12px 4px 10px; border-radius: 999px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06); cursor: pointer; }
+.ask-reopen:hover { color: var(--text); background: var(--bg-hover); }
+/* Checklist button under a call's title: opens the beats covered on the call */
+.beats-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-2); background: var(--card); color: var(--text-2); font: inherit; font-size: 12.5px; font-weight: 500; padding: 3px 8px 3px 4px; border-radius: 999px; cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s; }
+.beats-btn:hover, .beats-btn.on { background: var(--bg-hover); color: var(--text); border-color: var(--text-3); }
+.beats-ring { width: 17px; height: 17px; border-radius: 50%; display: grid; place-items: center; background: var(--green); color: #fff; }
+.beats-ring.none { background: transparent; box-shadow: inset 0 0 0 1.5px var(--line-2); color: transparent; }
+.beats-ring svg { width: 10px; height: 10px; }
+.beats-sub { color: var(--text-3); font-weight: 400; }
+.beats-chev { display: grid; place-items: center; color: var(--text-3); transition: transform 0.15s; }
+.beats-chev svg { width: 12px; height: 12px; transform: rotate(90deg); }
+.beats-btn.on .beats-chev { transform: rotate(180deg); }
 
 /* ---- page basics ---- */
 html, body { background: var(--bg); }

@@ -2,6 +2,7 @@
 // the bottom of each call. Conversations stay in memory per scope.
 
 const askThreads = new Map(); // scope -> [{ role, text, used }]
+const askClosed = new Set();   // docked chats the user closed (scope), so a repaint keeps them closed
 
 const ASK_PROMPTS = {
   global: [
@@ -55,6 +56,7 @@ function askPanel({ callId = null, folderId = null, folderName = '', compact = f
     q = String(q || '').trim();
     if (!q || busy) return;
     busy = true; sendBtn.disabled = true; input.value = ''; input.style.height = 'auto';
+    askClosed.delete(scope);
     const history = thread.filter((m) => !m.pending && !m.error).map((m) => ({ role: m.role, text: m.text })).slice(-10);
     thread.push({ role: 'user', text: q });
     const pending = { role: 'assistant', pending: true, text: '' };
@@ -67,13 +69,56 @@ function askPanel({ callId = null, folderId = null, folderName = '', compact = f
     drawLog(); drawChips();
   }
   const chips = h('div', { class: 'ask-chips' });
+  const newChat = () => { thread.length = 0; askClosed.delete(scope); drawLog(); drawChips(); };
   function drawChips() {
     chips.replaceChildren(...(thread.length ? [] : ASK_PROMPTS[kind].map((p) => h('button', { class: 'chip-btn', onclick: () => send(p) }, p))),
-      thread.length ? h('button', { class: 'link-btn', onclick: () => { thread.length = 0; drawLog(); drawChips(); } }, 'New chat') : null);
+      thread.length && !dock ? h('button', { class: 'link-btn', onclick: newChat }, 'New chat') : null);
+    layout();
   }
+  if (!dock) {
+    drawLog(); drawChips();
+    box.replaceChildren(log, chips, h('div', { class: 'ask-bar' }, input, sendBtn));
+    return box;
+  }
+
+  // Docked at the bottom of a page: the chat opens in its own panel above the box, with a
+  // header and a close button. Esc or a click anywhere outside closes it; "Show chat" opens it again.
+  const panel = h('div', { class: 'ask-panel', role: 'dialog', 'aria-label': 'Ask Cue' },
+    h('div', { class: 'ask-head' },
+      h('span', { class: 'ask-title' }, h('span', { class: 'ask-ic', html: ICON.sparkle }), 'Ask Cue',
+        h('span', { class: 'ask-scope' }, callId ? 'about this call' : folderId ? `about ${folderName || 'this folder'}` : 'about all calls')),
+      h('span', { class: 'grow' }),
+      h('button', { class: 'link-btn', onclick: () => { newChat(); input.focus(); } }, 'New chat'),
+      h('button', { class: 'icon-btn ask-close', title: 'Close (Esc)', 'aria-label': 'Close chat', html: ICON.x, onclick: () => setOpen(false) })),
+    log);
+  const reopen = h('div', { class: 'ask-reopen-row' },
+    h('button', { class: 'ask-reopen', onclick: () => setOpen(true) }, h('span', { class: 'ask-ic', html: ICON.sparkle }), 'Show chat'));
+  function layout() {
+    if (!dock) return;
+    const has = thread.length > 0, open = has && !askClosed.has(scope);
+    panel.hidden = !open;
+    reopen.hidden = !has || open;
+    box.classList.toggle('open', open);
+  }
+  function setOpen(on) {
+    if (on) askClosed.delete(scope); else askClosed.add(scope);
+    layout();
+    if (on) log.scrollTop = log.scrollHeight;
+  }
+  const isOpen = () => box.isConnected && thread.length > 0 && !askClosed.has(scope);
+  const offPage = () => { if (box.isConnected) return false; document.removeEventListener('mousedown', onDown, true); document.removeEventListener('keydown', onKey); return true; };
+  const onDown = (e) => { if (!offPage() && isOpen() && !box.contains(e.target)) setOpen(false); };
+  const onKey = (e) => {
+    if (offPage() || e.key !== 'Escape' || e.defaultPrevented || !isOpen()) return;
+    const a = document.activeElement;
+    if (a && a !== document.body && !box.contains(a)) return; // Esc belongs to whatever else has focus
+    e.preventDefault(); setOpen(false); input.blur();
+  };
+  document.addEventListener('mousedown', onDown, true);
+  document.addEventListener('keydown', onKey);
   drawLog(); drawChips();
-  box.classList.toggle('dock', dock);
-  box.replaceChildren(log, chips, h('div', { class: 'ask-bar' }, input, sendBtn));
+  box.classList.add('dock');
+  box.replaceChildren(panel, reopen, chips, h('div', { class: 'ask-bar' }, input, sendBtn));
   return box;
 }
 
