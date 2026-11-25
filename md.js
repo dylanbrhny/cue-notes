@@ -9,7 +9,8 @@ const mdEsc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': 
 //  2. marked's "already escaped" text is never trusted, and links may only be web or mail links;
 //  3. the HTML marked returns is rebuilt from a short allowlist of tags (cleanHtml),
 //     so nothing else (scripts, images, event handlers, styles) can reach the page.
-const md = new marked.Marked({ gfm: true, breaks: false });
+// silent: a note marked can't parse (e.g. thousands of ">" in a row) shows as text instead of breaking the page.
+const md = new marked.Marked({ gfm: true, breaks: false, silent: true });
 md.use({ renderer: { html: (token) => mdEsc(token.raw ?? token.text ?? '') } });
 md.use({ walkTokens: (t) => {
   if (t.escaped) t.escaped = false;
@@ -48,4 +49,6 @@ function cleanHtml(html) {
   copy(tpl.content, out);
   return out.innerHTML;
 }
-const renderMd = (text) => cleanHtml(md.parse(String(text || '')));
+const renderMd = (text) => {
+  try { return cleanHtml(md.parse(String(text || ''))); } catch { return `<p>${mdEsc(String(text || '')).replace(/\n/g, '<br>')}</p>`; }
+};

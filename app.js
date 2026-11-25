@@ -83,9 +83,13 @@ function h(tag, attrs = {}, ...kids) {
   return el;
 }
 
+// d.flush() runs a pending call now (before the page changes).
 function debounce(fn, ms) {
   let t;
-  return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+  let args = null;
+  const d = (...a) => { clearTimeout(t); args = a; t = setTimeout(() => { const x = args; args = null; fn(...x); }, ms); };
+  d.flush = () => { if (!args) return; clearTimeout(t); const x = args; args = null; fn(...x); };
+  return d;
 }
 
 function esc(s) {
@@ -235,6 +239,8 @@ new MutationObserver(() => {
 
 function go(r) {
   if (route.view === 'monitor' && (r.view !== 'monitor' || r.id !== route.id)) stopMonitor();
+  activeNotepad?.flush?.(); // edits typed in the last moment before leaving still save
+  activeNotepad = null;
   route = r;
   renderNav();
   renderList();
@@ -356,7 +362,9 @@ function renderLive(full) {
     liveNotesEl = h('textarea', { class: 'notes', placeholder: 'Type notes as you go. Cue blends them into the summary after the call.', value: liveState.myNotes || '', oninput: (e) => pushNotes(e.target.value) });
     $view.replaceChildren(
       h('div', { class: 'meta' }, h('span', { class: 'chip live' }, 'Live'), h('span', { id: 'live-clock' }, fmtClock(Date.now() - s.startedAt)), liveState.app ? h('span', {}, liveState.app) : null, h('span', { class: 'chip' }, s.presetName)),
-      h('div', { class: 'row', style: 'margin-bottom:18px' }, h('h1', { class: 'page', style: 'flex:1;margin:0' }, 'Call in progress'), h('button', { class: 'btn', onclick: () => call('call:stop') }, 'End call and write notes')),
+      h('div', { class: 'row', style: 'margin-bottom:18px' }, h('h1', { class: 'page', style: 'flex:1;margin:0' }, 'Call in progress'),
+        h('button', { class: 'btn', id: 'live-pause', onclick: () => call('call:pause', !liveState?.paused) }, liveState.paused ? 'Resume' : 'Pause'),
+        h('button', { class: 'btn', onclick: () => { pushNotes.flush(); call('call:stop'); } }, 'End call and write notes')),
       h('div', { id: 'live-warn' }),
       h('div', { id: 'live-coverage' }),
       h('div', { class: 'section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Your notes')), liveNotesEl),
@@ -364,6 +372,8 @@ function renderLive(full) {
         h('div', { class: 'md live-notes', id: 'live-ai-notes' }, h('div', { class: 'placeholder' }, 'Cue writes these as the call goes, every couple of minutes.'))),
       h('div', { class: 'section', style: s.total ? '' : 'display:none' }, h('div', { class: 'section-head' }, h('h2', {}, 'Checklist')), h('ul', { class: 'checks', id: 'live-checks' })),   // note-taking calls have no checklist
       h('div', { class: 'section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Live transcript')), h('div', { class: 'lines', id: 'live-lines' })),
+      // Ask about the call while it's on, like Granola (the same chat carries on after the call).
+      authState.user && !isClientUser() && liveState.callId ? h('div', { class: 'ask-dock' }, askPanel({ callId: liveState.callId, compact: true, dock: true })) : null,
     );
     liveBuilt = true;
     call('call:liveNotes').then((n) => { if (n) { if (n.text) document.getElementById('live-ai-notes')?.replaceChildren(h('div', { html: renderMd(n.text) })); if (n.people?.length) { const p = document.getElementById('live-people'); if (p) p.textContent = `With ${n.people.join(', ')}`; } } });
@@ -381,7 +391,11 @@ function renderLive(full) {
   }
   const warn = document.getElementById('live-warn');
   const w = liveState.warning || liveState.setupWarning;
-  warn.replaceChildren(w ? h('div', { class: 'banner warn' }, w) : '');
+  warn.replaceChildren(
+    liveState.paused ? h('div', { class: 'banner paused' }, h('span', { class: 'grow' }, 'Paused. Cue isn’t listening, so nothing said now goes in the transcript or the notes.'), h('button', { class: 'btn primary', onclick: () => call('call:pause', false) }, 'Resume')) : '',
+    w ? h('div', { class: 'banner warn' }, w) : '');
+  const pauseBtn = document.getElementById('live-pause');
+  if (pauseBtn) pauseBtn.textContent = liveState.paused ? 'Resume' : 'Pause';
   const checksKey = JSON.stringify(s.items.map((i) => [i.id, i.done]));
   const checksEl = document.getElementById('live-checks');
   if (checksEl.dataset.key !== checksKey) {
@@ -419,7 +433,7 @@ function checkRow(i, isLive) {
 
 function lineRow(seg, key, partial = false, names = { me: 'You', them: 'Them' }) {
   const who = seg.speaker === 'me' ? names.me : seg.speaker === 'them' ? names.them : (seg.speaker || '');
-  return h('div', { class: `line ${seg.speaker === 'me' ? 'me' : 'them'} ${partial ? 'partial' : ''}`, 'data-k': key },
+  return h('div', { class: `line ${seg.speaker === 'me' ? 'me' : 'them'} ${partial ? 'partial' : ''}`, 'data-k': key, title: typeof seg.at === 'number' ? fmtClock(seg.at) : null },
     h('span', { class: 'who', title: who }, who), h('span', {}, seg.text));
 }
 
@@ -431,6 +445,9 @@ setInterval(() => {
 // ---------------------------------------------------------------------------
 // A finished call
 // ---------------------------------------------------------------------------
+
+let undoRewrite = null;   // { id, aiNotes, notesMine, template } right after "Rewrite notes"
+let activeNotepad = null; // the open call's notepad (to save pending edits before leaving)
 
 async function renderCall(id) {
   const fresh = pageTicket();
@@ -444,25 +461,63 @@ async function renderCall(id) {
   const [shareBtn, shareBox] = shareButton(c) || [null, null];
   const names = c.mine === false && c.owner ? { me: c.owner.split(' ')[0], them: 'Them' } : { me: 'You', them: 'Them' };
 
+  if (undoRewrite && undoRewrite.id !== id) undoRewrite = null;
   // Everything that isn't the notes lives in one quiet "…" menu.
-  const rewrite = async () => { body.replaceChildren(h('div', { class: 'placeholder' }, h('span', { class: 'spin' }), 'Writing notes…')); await call('calls:rewrite', id); renderCall(id); };
+  // Rewriting keeps what you had if the AI can't write new notes, and can be undone.
+  const rewrite = async (presetId = null, templateName = '') => {
+    np?.flush?.();
+    const before = { aiNotes: c.aiNotes || '', notesMine: np?.edits?.() || c.notesMine || [] };
+    if (before.aiNotes && before.notesMine.length && !confirm('Write the notes again? Your edits to the AI notes will be replaced (your own notes stay, and you can undo right after).')) return;
+    np?.flush?.();
+    body.replaceChildren(h('div', { class: 'placeholder' }, h('span', { class: 'spin' }), templateName ? `Writing notes with “${templateName}”…` : 'Writing notes…'));
+    const r = await call('calls:rewrite', presetId ? { id, presetId } : id);
+    if (r && r.ok === false) { if (route.view === 'call' && route.id === id) renderCall(id); alert(r.error); return; }
+    undoRewrite = before.aiNotes ? { id, ...before, template: r?.template || templateName } : null;
+    if (route.view === 'call' && route.id === id) renderCall(id);
+  };
   const attach = async () => { const r = await call('files:attach', c.id); if (!r.ok) alert(r.error); loadFiles(); };
+  const flashMenu = (text) => { const el = h('div', { class: 'np-toast' }, text); document.body.append(el); setTimeout(() => el.remove(), 1600); };
   let menuOpenHere = false;
+  let menuPage = 'main';
+  let templates = null;
   const menuWrap = h('span', { class: 'more-wrap' });
+  const pickTemplate = async () => {
+    menuPage = 'templates';
+    if (!templates) {
+      const [notesT, presets] = await Promise.all([call('notes:templates'), isClientUser() ? [] : call('presets:get')]);
+      // Note templates; a coaching call can also be written up with another coaching preset.
+      templates = [...(notesT || []), ...(presets || []).filter((p) => p.kind === 'notes' || c.mode !== 'notes')].filter((p, i, all) => p && p.id && all.findIndex((x) => x.id === p.id) === i);
+    }
+    drawMenu();
+  };
   const drawMenu = () => menuWrap.replaceChildren(
-    h('button', { class: 'icon-btn', title: 'More', onclick: (e) => { e.stopPropagation(); menuOpenHere = !menuOpenHere; drawMenu(); } }, h('span', { html: ICON.dots, style: 'display:inline-grid;width:16px;height:16px' })),
-    menuOpenHere ? h('div', { class: 'pop menu-pop right' },
-      menuItem(c.aiNotes ? 'Rewrite notes' : 'Write notes with AI', rewrite),
+    h('button', { class: 'icon-btn', title: 'More', onclick: (e) => {
+      e.stopPropagation(); menuOpenHere = !menuOpenHere; menuPage = 'main'; drawMenu();
+      // A click anywhere else closes it (every time it opens, not just the first).
+      if (menuOpenHere) document.addEventListener('click', () => { if (menuOpenHere) { menuOpenHere = false; drawMenu(); } }, { once: true });
+    } }, h('span', { html: ICON.dots, style: 'display:inline-grid;width:16px;height:16px' })),
+    menuOpenHere && menuPage === 'templates' ? h('div', { class: 'pop menu-pop right tpl-pop', onclick: (e) => e.stopPropagation() },
+      h('div', { class: 'menu-head' }, 'Write the notes with'),
+      (templates || []).map((t) => h('button', { type: 'button', class: t.id === c.presetId ? 'on' : '', onclick: () => { menuOpenHere = false; drawMenu(); rewrite(t.id, t.name); } }, t.name))) : null,
+    menuOpenHere && menuPage === 'main' ? h('div', { class: 'pop menu-pop right' },
+      menuItem(c.aiNotes ? 'Rewrite notes' : 'Write notes with AI', () => rewrite()),
+      isClientUser() ? null : h('button', { type: 'button', onclick: (e) => { e.stopPropagation(); pickTemplate(); } }, 'Rewrite with another template…'),
+      c.aiNotes || c.myNotes ? menuItem('Copy as Markdown', async () => { np?.flush?.(); const ok = await navigator.clipboard.writeText(noteMarkdown(c)).then(() => true, () => false); flashMenu(ok ? 'Notes copied as Markdown' : 'Copy failed'); }) : null,
+      c.aiNotes || c.myNotes || (c.transcript || []).length ? menuItem('Download notes (.md)', () => { np?.flush?.(); downloadText(fileNameFor(c), `${noteMarkdown(c)}${(c.transcript || []).length ? `\n## Transcript\n\n${transcriptText(c, names)}\n` : ''}`); }) : null,
       authState.user && !isClientUser() ? menuItem('Attach files', attach) : null,
       authState.user && !isClientUser() && c.status !== 'live' && c.status !== 'writing' ? menuItem(c.archivedAt ? 'Unarchive' : 'Archive', () => archiveCalls([id], !c.archivedAt)) : null,
       isClientUser() ? null : authState.user
         ? menuItem('Delete call', () => trashCalls([id]), true)
         : menuItem('Delete call', async () => { if (!confirm('Delete this call and its notes? This cannot be undone.')) return; await call('calls:delete', id); go({ view: 'home' }); }, true)) : null);
   drawMenu();
-  document.addEventListener('click', () => { if (menuOpenHere) { menuOpenHere = false; drawMenu(); } }, { once: true });
 
   // Who was on it, in one quiet line.
-  const others = (c.attendees || []).filter((a) => !isOurs(a.email)).map((a) => a.name || (a.email || '').split('@')[0]).filter(Boolean);
+  // The people on the other side: click one to open their page (like Granola's attendee chips).
+  const otherPeople = (c.attendees || []).filter((a) => !isOurs(a.email) && (a.name || a.email));
+  const personBit = (a) => {
+    const label = a.name || String(a.email).split('@')[0];
+    return authState.user && !isClientUser() && a.email ? h('button', { class: 'meta-person', title: a.email, onclick: () => go({ view: 'person', id: String(a.email).toLowerCase() }) }, label) : label;
+  };
   let showBeats = false;
   const beatsBox = h('div');
   const drawBeats = () => beatsBox.replaceChildren(...(showBeats ? [h('div', { class: 'beats' },
@@ -472,7 +527,6 @@ async function renderCall(id) {
     `${new Date(c.startedAt).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}, ${timeOf(c.startedAt)}`,
     c.durationMs > 0 ? fmtDur(c.durationMs) : null,
     c.mine === false && c.owner ? c.owner.split(' ')[0] : null,
-    others.length ? others.slice(0, 3).join(', ') + (others.length > 3 ? ` +${others.length - 3}` : '') : null,
   ].filter(Boolean);
   // Talk time: you vs each person on the other side (when the call was split by speaker).
   const talk = c.talk || {};
@@ -489,9 +543,17 @@ async function renderCall(id) {
   };
   loadFiles();
 
-  const body = h('div', { class: 'call-body' }, c.status === 'writing'
-    ? h('div', { class: 'placeholder' }, h('span', { class: 'spin' }), 'Writing notes…')
-    : notepad(c, { transcript: h('div', { class: 'lines' }, (c.transcript || []).map((s) => lineRow(s, null, false, names))) }));
+  const np = c.status === 'writing' ? null : notepad(c, { names, transcript: h('div', { class: 'lines' }, (c.transcript || []).map((s) => lineRow(s, null, false, names))) });
+  activeNotepad = np;
+  const body = h('div', { class: 'call-body' }, np || h('div', { class: 'placeholder' }, h('span', { class: 'spin' }), 'Writing notes…'));
+  const undoBar = undoRewrite?.id === id ? h('div', { class: 'banner undo-bar' },
+    h('span', { class: 'grow' }, `Notes rewritten${undoRewrite.template ? ` with “${undoRewrite.template}”` : ''}.`),
+    h('button', { class: 'btn', onclick: async () => {
+      const u = undoRewrite; undoRewrite = null;
+      await call('calls:update', { id, patch: { aiNotes: u.aiNotes, notesMine: u.notesMine } });
+      renderCall(id);
+    } }, 'Undo'),
+    h('button', { class: 'icon-btn', title: 'Dismiss', html: ICON.x, onclick: () => { undoRewrite = null; undoBar.remove(); } })) : null;
 
   const page = h('div', { class: 'call-page' },
     h('div', { class: 'call-top' },
@@ -504,11 +566,12 @@ async function renderCall(id) {
     shareBox,
     h('input', { class: 'title-input', value: c.title || '', placeholder: 'Untitled call', oninput: (e) => saveTitle(e.target.value) }),
     h('div', { class: 'call-meta' },
-      h('span', {}, metaBits.join(' · ')),
+      h('span', {}, metaBits.join(' · '), otherPeople.length ? [' · ', ...otherPeople.slice(0, 3).flatMap((a, i) => [i ? ', ' : '', personBit(a)]), otherPeople.length > 3 ? ` +${otherPeople.length - 3}` : ''] : null),
       talkLine ? h('span', { class: 'meta-talk', title: 'Share of talking time' }, talkLine) : null,
       coaching ? h('button', { class: 'meta-link', onclick: () => { showBeats = !showBeats; drawBeats(); } }, `${c.done}/${c.total} beats${c.dreamScore != null ? ` · outcome ${c.dreamScore}%` : ''}`) : null,
       c.status === 'interrupted' || c.status === 'live' ? h('span', { class: 'meta-warn' }, 'Interrupted') : null),
     beatsBox,
+    undoBar,
     body,
     filesRow,
     authState.user && !isClientUser() && c.status !== 'live' && c.status !== 'writing' ? h('div', { class: 'ask-dock' }, askPanel({ callId: c.id, compact: true, dock: true })) : null);
@@ -521,6 +584,7 @@ async function renderCall(id) {
     if (!r.ok) alert(r.error); loadFiles();
   });
   if (!fresh()) return;
+  $view.dataset.status = c.status || '';
   $view.replaceChildren(page);
 }
 
@@ -851,7 +915,19 @@ async function renderSettings() {
 
 let routedByMain = false;
 window.cue.on('route', (r) => { routedByMain = true; go(r); });
-window.cue.on('calls:changed', () => { renderList(); if (route.view === 'call') renderCall(route.id); if (route.view === 'home') renderHome(); });
+// Typing in a call's notes or title: don't redraw the page under you (it would drop the
+// caret and could show an older copy). Redraw only when the call itself moved on, e.g.
+// "Writing notes…" became the notes.
+const editingInView = () => { const a = document.activeElement; return !!a && $view.contains(a) && (a.isContentEditable || /^(TEXTAREA|INPUT)$/.test(a.tagName)); };
+window.cue.on('calls:changed', async (p) => {
+  renderList();
+  if (route.view === 'home') renderHome();
+  if (route.view !== 'call' || (p?.id && p.id !== route.id)) return;
+  if (!editingInView()) return renderCall(route.id);
+  const id = route.id;
+  const c = await call('calls:get', id).catch(() => null);
+  if (c && route.view === 'call' && route.id === id && c.status !== $view.dataset.status) renderCall(id);
+});
 window.cue.on('team:changed', () => { renderList(); renderTeamLive(); });
 window.cue.on('auth:changed', async () => { authState = await call('auth:state'); loadTeamEmails(); renderAccount(); renderNav(); renderTeamLive(); renderFolders(); presetsChanged(); renderView(); });
 window.cue.on('computers:changed', () => { if (route.view === 'settings' || route.view === 'admin') renderView(); });
@@ -887,6 +963,17 @@ window.cue.on('live:state', (st) => {
   renderStart();
   if (route.view === 'live') renderLive(false);
   if (wasLive !== (st.mode === 'live')) renderList();
+});
+
+// Cmd/Ctrl+K: search every call (titles, people, notes and transcripts), like Granola.
+document.addEventListener('keydown', (e) => {
+  if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== 'k') return;
+  e.preventDefault();
+  const focusSearch = () => { const box = $view.querySelector('.tab-tools .search'); if (box) { box.focus(); box.select(); return true; } return false; };
+  if (route.view === 'home' && focusSearch()) return;
+  go({ view: 'home' });
+  let tries = 0;
+  const t = setInterval(() => { if (focusSearch() || ++tries > 40) clearInterval(t); }, 50);
 });
 
 // Start once every script on the page (app.js, team.js) has run.

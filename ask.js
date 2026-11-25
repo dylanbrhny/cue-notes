@@ -10,6 +10,12 @@ const ASK_PROMPTS = {
     'Which prospects are waiting on us for a next step?',
     'What have clients complained about this month?',
   ],
+  folder: [
+    'What do these calls have in common?',
+    'Which of these are waiting on us for a next step?',
+    'What objections came up across these calls?',
+    'Summarize where each account stands',
+  ],
   call: [
     'Write the follow-up email',
     'List the action items with owners',
@@ -18,13 +24,14 @@ const ASK_PROMPTS = {
   ],
 };
 
-function askPanel({ callId = null, compact = false, dock = false } = {}) {
-  const scope = callId || 'global';
+function askPanel({ callId = null, folderId = null, folderName = '', compact = false, dock = false } = {}) {
+  const scope = callId || (folderId ? `folder:${folderId}` : 'global');
+  const kind = callId ? 'call' : folderId ? 'folder' : 'global';
   if (!askThreads.has(scope)) askThreads.set(scope, []);
   const thread = askThreads.get(scope);
   const box = h('div', { class: `ask ${compact ? 'compact' : ''}` });
   const log = h('div', { class: 'ask-log' });
-  const input = h('textarea', { class: 'ask-input', rows: 1, placeholder: callId ? 'Ask about this call…' : 'Ask anything about the team’s calls…',
+  const input = h('textarea', { class: 'ask-input', rows: 1, placeholder: callId ? 'Ask about this call…' : folderId ? `Ask about the calls in ${folderName || 'this folder'}…` : 'Ask anything about the team’s calls…',
     onfocus: () => box.classList.add('focused'), onblur: () => setTimeout(() => box.classList.remove('focused'), 150),
     onkeydown: (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input.value); } },
     oninput: () => { input.style.height = 'auto'; input.style.height = `${Math.min(input.scrollHeight, 160)}px`; } });
@@ -53,7 +60,7 @@ function askPanel({ callId = null, compact = false, dock = false } = {}) {
     const pending = { role: 'assistant', pending: true, text: '' };
     thread.push(pending);
     drawLog(); drawChips();
-    const r = await call('ask:run', { question: q, history, callId });
+    const r = await call('ask:run', { question: q, history, callId, folderId });
     pending.pending = false;
     if (r.ok) { pending.text = r.text || 'No answer.'; pending.used = r.used; } else { pending.error = true; pending.text = r.error; }
     busy = false; sendBtn.disabled = false;
@@ -61,7 +68,7 @@ function askPanel({ callId = null, compact = false, dock = false } = {}) {
   }
   const chips = h('div', { class: 'ask-chips' });
   function drawChips() {
-    chips.replaceChildren(...(thread.length ? [] : ASK_PROMPTS[callId ? 'call' : 'global'].map((p) => h('button', { class: 'chip-btn', onclick: () => send(p) }, p))),
+    chips.replaceChildren(...(thread.length ? [] : ASK_PROMPTS[kind].map((p) => h('button', { class: 'chip-btn', onclick: () => send(p) }, p))),
       thread.length ? h('button', { class: 'link-btn', onclick: () => { thread.length = 0; drawLog(); drawChips(); } }, 'New chat') : null);
   }
   drawLog(); drawChips();

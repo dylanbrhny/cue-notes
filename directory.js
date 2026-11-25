@@ -53,8 +53,8 @@ async function loadCompanyNames() {
   try { companyNames = new Map((await call('companies:list')).map((c) => [c.domain, c.name])); } catch {}
 }
 function callWho(c) {
-  const outside = (c.attendees || []).filter((a) => a.email && !isOurs(a.email));
-  const domain = outside.map((a) => a.email.split('@')[1].toLowerCase()).find((d) => !PERSONAL.test(d)) || null;
+  const outside = (Array.isArray(c.attendees) ? c.attendees : []).filter((a) => a && typeof a.email === 'string' && a.email.includes('@') && !isOurs(a.email));
+  const domain = outside.map((a) => a.email.split('@')[1].toLowerCase()).find((d) => d && !PERSONAL.test(d)) || null;
   const company = domain ? (companyNames.get(domain) || domain.split('.')[0].replace(/^./, (x) => x.toUpperCase())) : null;
   const people = outside.map((a) => a.name || a.email.split('@')[0]).filter(Boolean);
   return { domain, company, people };

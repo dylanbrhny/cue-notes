@@ -928,3 +928,23 @@ h1.page, .title-input { font-family: var(--font); font-size: 24px; line-height: 
 .folder-ico.big, .folder-ico.big svg { width: 30px; height: 30px; color: var(--text-3); }
 .oc-pick { border: 0; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--line-2); }
 .oc-btn + .oc-btn { border-left: 1px solid var(--line-2); }
+
+/* The notepad's tools: Copy, save status, find in the transcript, undo after a rewrite. */
+.np-copy { border: 0; background: transparent; color: var(--text-3); font-family: var(--font); font-size: 12.5px; font-weight: 500; padding: 4px 8px; border-radius: 6px; }
+.np-copy:hover { color: var(--text); background: var(--bg-hover); }
+.np-status { font-size: 11.5px; color: var(--text-3); }
+.np-status.bad { color: var(--red); }
+.np-find-row { gap: 10px; margin: 0 0 12px; }
+.np-find { max-width: 280px; height: 30px; }
+.undo-bar { padding: 7px 8px 7px 12px; }
+.undo-bar .btn { height: 26px; }
+.menu-head { font-size: 11.5px; font-weight: 500; color: var(--text-3); padding: 6px 9px 4px; }
+.tpl-pop { max-height: 340px; overflow-y: auto; min-width: 240px; }
+.tpl-pop button.on { background: var(--active); }
+.np-toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 50; pointer-events: none;
+  padding: 7px 12px; border-radius: 6px; background: var(--ink); color: var(--ink-fg); font-size: 12.5px; box-shadow: var(--pop);
+}
+.banner.paused { border-color: var(--line-2); background: var(--bg-hover); color: var(--text); }
+.meta-person { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; text-decoration: underline dotted var(--text-3); text-underline-offset: 3px; }
+.meta-person:hover { color: var(--text); text-decoration-color: currentColor; }

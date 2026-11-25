@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-u5XUwV8SifeEhuqs6/O7GGiEde1YoEDvdi7UkzcJBUI=' 'sha256-nrjNfntQq5hpFFbnV5Zyx2f1/oEnPtAqcVUxOw7+KCU=' 'sha256-wUl/1e1P0/5eWZFRHKh6zCGDbbM4biLp4VxWdDVVu7c='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; media-src 'self'; connect-src https://vnukfvbmimakiotsanjv.supabase.co; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-u5XUwV8SifeEhuqs6/O7GGiEde1YoEDvdi7UkzcJBUI=' 'sha256-JrDXS5hcRCl67nfHlggjvGAVlhytp65dUAantVk1GRc=' 'sha256-wUl/1e1P0/5eWZFRHKh6zCGDbbM4biLp4VxWdDVVu7c='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; media-src 'self'; connect-src https://vnukfvbmimakiotsanjv.supabase.co; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <meta name="referrer" content="no-referrer">
@@ -164,7 +164,8 @@ const mdEsc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': 
 //  2. marked's "already escaped" text is never trusted, and links may only be web or mail links;
 //  3. the HTML marked returns is rebuilt from a short allowlist of tags (cleanHtml),
 //     so nothing else (scripts, images, event handlers, styles) can reach the page.
-const md = new marked.Marked({ gfm: true, breaks: false });
+// silent: a note marked can't parse (e.g. thousands of ">" in a row) shows as text instead of breaking the page.
+const md = new marked.Marked({ gfm: true, breaks: false, silent: true });
 md.use({ renderer: { html: (token) => mdEsc(token.raw ?? token.text ?? '') } });
 md.use({ walkTokens: (t) => {
   if (t.escaped) t.escaped = false;
@@ -203,7 +204,9 @@ function cleanHtml(html) {
   copy(tpl.content, out);
   return out.innerHTML;
 }
-const renderMd = (text) => cleanHtml(md.parse(String(text || '')));
+const renderMd = (text) => {
+  try { return cleanHtml(md.parse(String(text || ''))); } catch { return `<p>${mdEsc(String(text || '')).replace(/\n/g, '<br>')}</p>`; }
+};
 </script>
 <script>
 (function () {

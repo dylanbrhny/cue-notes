@@ -346,7 +346,9 @@ async function clientSettingsPanels() {
   const up = await call('update:state');
   panels.push(h('div', { class: 'panel' }, h('h3', {}, 'Updates'),
     h('div', { class: 'hint', style: 'margin-bottom:10px' }, `Cue ${up.current || info.version}. ${up.status === 'current' ? 'You have the latest version.' : up.status === 'ready' ? `Version ${up.latest} is ready.` : up.status === 'available' ? `Version ${up.latest} is available.` : 'Cue updates itself.'}`),
-    up.status === 'ready' ? h('button', { class: 'btn primary allow', onclick: async () => { const r = await call('update:install'); if (!r.ok) alert(r.error); } }, 'Restart to update') : null));
+    up.status === 'ready' ? h('button', { class: 'btn primary allow', onclick: async () => { const r = await call('update:install'); if (!r.ok) alert(r.error); } }, 'Restart to update') : null,
+    // Macs (teammates and clients) download the new version themselves.
+    up.status === 'available' && info.platform === 'darwin' ? h('button', { class: 'btn primary allow', onclick: async (e) => { e.target.disabled = true; e.target.textContent = 'Downloading…'; const r = await call('update:mac'); e.target.disabled = false; e.target.textContent = r.ok ? 'Opened' : 'Download update'; if (!r.ok) alert(r.error); } }, 'Download update') : null));
   return panels;
 }
 
@@ -1024,6 +1026,8 @@ async function renderFolder(id) {
         await call('folders:delete', id); await renderFolders(); go({ view: 'home' });
       } }, 'Delete')),
     meetings.length ? h('div', { class: 'folder-list' }, out) : h('div', { class: 'placeholder' }, 'No calls here yet. Drag a call from the sidebar onto this folder, or pick the folder at the top of a call.'),
+    // Ask about every call in this folder (and the folders inside it), like Granola's folder chat.
+    meetings.length && authState.user && !isClientUser() ? h('div', { class: 'ask-dock' }, askPanel({ folderId: id, folderName: f.name, compact: true, dock: true })) : null,
   );
 }
 
@@ -1164,7 +1168,7 @@ function shareButton(c) {
         flash('Link turned off');
       } }, 'Turn off'),
       h('button', { class: 'link-btn', onclick: () => { box.hidden = true; } }, 'Hide'),
-      h('div', { class: 'share-note' }, `Link copied. Opened ${share.views || 0} time${share.views === 1 ? '' : 's'}. Anyone with it can read the notes and transcript until you turn it off; typed private notes and emails never show.`));
+      h('div', { class: 'share-note' }, `Link copied. Opened ${share.views || 0} time${share.views === 1 ? '' : 's'}. Anyone with it can read the notes (including lines you typed) and the transcript until you turn it off. Emails never show; edit the notes first if something shouldn't be seen.`));
   }
   // Already shared: say so on the button.
   call('share:get', c.id).then((share) => { if (share) { btn.classList.add('on'); label.textContent = 'Shared'; btn.title = `Copy the link (opened ${share.views || 0} time${share.views === 1 ? '' : 's'})`; } }).catch(() => {});
