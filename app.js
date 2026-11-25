@@ -9,7 +9,11 @@
   Element.prototype.append = function (...kids) { return ap.apply(this, clean(kids)); };
 }
 
-const call = (ch, arg) => window.cue.invoke(ch, arg);
+const rawCall = (ch, arg) => window.cue.invoke(ch, arg);
+// View as (viewas.js): the admin previewing Cue as someone else. Every page reads through
+// call(), so the preview's read-only rules and filters sit in this one place.
+let viewAs = null;
+const call = (ch, arg) => (viewAs ? viewAsCall(ch, arg) : rawCall(ch, arg));
 // The browser version (cue.synapsemfg.com): everything except recording calls.
 const WEB = !!window.cue.web;
 const $view = document.getElementById('view');
@@ -29,7 +33,9 @@ let teamLive = []; // calls live on the team right now (team.js keeps it fresh)
 // Our side of a call: Synapse addresses plus everyone on the team list (any domain).
 let TEAM_EMAILS = new Set();
 // Cue for clients: a note taker that only shows the client's own calls.
-const isClientUser = () => authState.user?.role === 'client';
+// Who the pages are drawn for: you, or the person you're viewing Cue as.
+const viewer = () => viewAs || authState.user;
+const isClientUser = () => viewer()?.role === 'client';
 const isOurs = (e) => /@synapsemfg\.com$/i.test(e || '') || TEAM_EMAILS.has(String(e || '').toLowerCase());
 const loadTeamEmails = () => call('team:emails').then((l) => { if (Array.isArray(l) && l.length) TEAM_EMAILS = new Set(l); }).catch(() => {});
 // Line icons drawn like the Master Inbox's (24px grid, 1.6 stroke).
@@ -84,11 +90,15 @@ function h(tag, attrs = {}, ...kids) {
 }
 
 // d.flush() runs a pending call now (before the page changes).
+// Anything typed while viewing Cue as someone else (View as) is dropped, even if the
+// timer fires after the preview ends: the preview never saves.
 function debounce(fn, ms) {
   let t;
   let args = null;
-  const d = (...a) => { clearTimeout(t); args = a; t = setTimeout(() => { const x = args; args = null; fn(...x); }, ms); };
-  d.flush = () => { if (!args) return; clearTimeout(t); const x = args; args = null; fn(...x); };
+  let queuedInPreview = false;
+  const run = () => { const x = args; args = null; if (queuedInPreview) return; fn(...x); };
+  const d = (...a) => { clearTimeout(t); args = a; queuedInPreview = !!viewAs; t = setTimeout(run, ms); };
+  d.flush = () => { if (!args) return; clearTimeout(t); run(); };
   return d;
 }
 
@@ -172,7 +182,7 @@ function renderNav() {
   if (isClientUser()) { $nav.replaceChildren(item('home', 'Home', 'home')); $foot.replaceChildren(item('settings', 'Settings', 'settings')); return; }
   $nav.replaceChildren(item('home', 'Home', 'home'), live, authState.user ? item('ask', 'Ask Cue', 'sparkle') : null, authState.user ? item('wins', 'What wins', 'trophy') : null);
   $foot.replaceChildren(item('presets', 'Presets', 'presets'), item('settings', 'Settings', 'settings'),
-    authState.user?.role === 'admin' ? item('admin', 'Admin', 'shield') : null);
+    viewer()?.role === 'admin' ? item('admin', 'Admin', 'shield') : null);
 }
 
 async function renderList() {
@@ -373,10 +383,10 @@ function renderLive(full) {
       h('div', { class: 'section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Your notes')), liveNotesEl),
       h('div', { class: 'section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Live notes'), h('span', { class: 'saved', id: 'live-people' })),
         h('div', { class: 'md live-notes', id: 'live-ai-notes' }, h('div', { class: 'placeholder' }, 'Cue writes these as the call goes, every couple of minutes.'))),
-      h('div', { class: 'section', style: s.total ? '' : 'display:none' }, h('div', { class: 'section-head' }, h('h2', {}, 'Checklist')), h('ul', { class: 'checks', id: 'live-checks' })),   // note-taking calls have no checklist
+      h('div', { class: 'section', style: s.items.length ? '' : 'display:none' }, h('div', { class: 'section-head' }, h('h2', {}, 'Checklist')), h('ul', { class: 'checks', id: 'live-checks' })),   // note-taking calls have no checklist
       h('div', { class: 'section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Live transcript')), h('div', { class: 'lines', id: 'live-lines' })),
       // Ask about the call while it's on, like Granola (the same chat carries on after the call).
-      authState.user && !isClientUser() && liveState.callId ? h('div', { class: 'ask-dock' }, askPanel({ callId: liveState.callId, compact: true, dock: true })) : null,
+      authState.user && !isClientUser() && !viewAs && liveState.callId ? h('div', { class: 'ask-dock' }, askPanel({ callId: liveState.callId, compact: true, dock: true })) : null,
     );
     liveBuilt = true;
     call('call:liveNotes').then((n) => { if (n) { if (n.text) document.getElementById('live-ai-notes')?.replaceChildren(h('div', { html: renderMd(n.text) })); if (n.people?.length) { const p = document.getElementById('live-people'); if (p) p.textContent = `With ${n.people.join(', ')}`; } } });
@@ -399,12 +409,12 @@ function renderLive(full) {
     w ? h('div', { class: 'banner warn' }, w) : '');
   const pauseBtn = document.getElementById('live-pause');
   if (pauseBtn) pauseBtn.textContent = liveState.paused ? 'Resume' : 'Pause';
-  const checksKey = JSON.stringify(s.items.map((i) => [i.id, i.done]));
+  const checksKey = JSON.stringify(s.items.map((i) => [i.id, i.done, i.skipped, i.say]));
   const checksEl = document.getElementById('live-checks');
   if (checksEl.dataset.key !== checksKey) {
     checksEl.dataset.key = checksKey;
     document.getElementById('live-coverage').replaceChildren(...(s.total ? [coverage(s.done, s.total)] : []));
-    checksEl.replaceChildren(...s.items.map((i) => checkRow(i, true)));
+    checksEl.replaceChildren(...[...s.items.filter((i) => !i.skipped), ...s.items.filter((i) => i.skipped)].map((i) => checkRow(i, true)));
   }
   const lines = document.getElementById('live-lines');
   const atBottom = $view.parentElement.scrollHeight - $view.parentElement.scrollTop - $view.parentElement.clientHeight < 80;
@@ -428,10 +438,21 @@ function coverage(done, total) {
     h('span', { class: 'segs' }, Array.from({ length: total }, (_, i) => h('i', { class: i < done ? 'on' : '' }))));
 }
 
+// One beat: ticked, open (with what to say for this prospect, from the prep), or not for
+// this call (with why, and who said so). Live rows tick on click and can be skipped.
 function checkRow(i, isLive) {
+  if (i.skipped) {
+    return h('li', { class: 'skipped', title: 'Not for this call: doesn’t count for or against the rep' },
+      h('span', { class: 'box skip-box' }),
+      h('span', { class: 'grow' }, h('span', { class: 'label' }, i.label),
+        h('span', { class: 'ev' }, `Not for this call${i.skipReason ? `: ${i.skipReason}` : ''}${i.skipBy && i.skipBy !== 'manual' ? ' (Cue)' : ''}`)),
+      isLive ? h('button', { class: 'link-btn', onclick: (e) => { e.stopPropagation(); call('call:skip', { id: i.id, skip: false }); } }, 'Bring back') : null);
+  }
   return h('li', { class: `${i.done ? 'done' : ''} ${isLive ? 'live' : ''}`, onclick: isLive ? () => call('call:toggle', i.id) : null, title: isLive ? 'Click to tick by hand' : null },
     h('span', { class: 'box', html: i.done ? ICON.check : '' }),
-    h('span', {}, h('span', { class: 'label' }, i.label), i.done && i.evidence ? h('span', { class: 'ev' }, `“${i.evidence}”`) : null));
+    h('span', { class: 'grow' }, h('span', { class: 'label' }, i.label), i.done && i.evidence ? h('span', { class: 'ev' }, `“${i.evidence}”`) : null,
+      !i.done && i.say ? h('span', { class: 'say' }, `For them: ${i.say}`) : null),
+    isLive && !i.done ? h('button', { class: 'link-btn skip-link', title: 'Not for this call (doesn’t count against you)', onclick: (e) => { e.stopPropagation(); call('call:skip', { id: i.id, skip: true }); } }, 'Not for this call') : null);
 }
 
 function lineRow(seg, key, partial = false, names = { me: 'You', them: 'Them' }) {
@@ -524,7 +545,7 @@ async function renderCall(id) {
   let showBeats = false;
   const beatsBox = h('div');
   const drawBeats = () => beatsBox.replaceChildren(...(showBeats ? [h('div', { class: 'beats' },
-    h('ul', { class: 'checks' }, (c.checklist || []).map((i) => checkRow(i, false))),
+    h('ul', { class: 'checks' }, [...(c.checklist || []).filter((i) => !i.skipped), ...(c.checklist || []).filter((i) => i.skipped)].map((i) => checkRow(i, false))),
     (c.objections || []).length ? h('div', { class: 'beats-obj' }, c.objections.map((o) => h('div', {}, h('b', {}, o.title), o.quote ? ` “${o.quote}”` : ''))) : null)] : []));
   const metaBits = [
     `${new Date(c.startedAt).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}, ${timeOf(c.startedAt)}`,
@@ -567,7 +588,7 @@ async function renderCall(id) {
       isClientUser() ? null : shareBtn,
       menuWrap),
     shareBox,
-    h('input', { class: 'title-input', value: c.title || '', placeholder: 'Untitled call', oninput: (e) => saveTitle(e.target.value) }),
+    h('input', { class: 'title-input', value: c.title || '', placeholder: 'Untitled call', readonly: viewAs ? true : null, oninput: (e) => saveTitle(e.target.value) }),
     h('div', { class: 'call-meta' },
       h('span', {}, metaBits.join(' · '), otherPeople.length ? [' · ', ...otherPeople.slice(0, 3).flatMap((a, i) => [i ? ', ' : '', personBit(a)]), otherPeople.length > 3 ? ` +${otherPeople.length - 3}` : ''] : null),
       talkLine ? h('span', { class: 'meta-talk', title: 'Share of talking time' }, talkLine) : null,
@@ -582,12 +603,13 @@ async function renderCall(id) {
     undoBar,
     body,
     filesRow,
-    authState.user && !isClientUser() && c.status !== 'live' && c.status !== 'writing' ? h('div', { class: 'ask-dock' }, askPanel({ callId: c.id, compact: true, dock: true })) : null);
+    authState.user && !isClientUser() && !viewAs && c.status !== 'live' && c.status !== 'writing' ? h('div', { class: 'ask-dock' }, askPanel({ callId: c.id, compact: true, dock: true })) : null);
   page.addEventListener('dragover', (e) => { if (authState.user && e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { e.preventDefault(); page.classList.add('drop'); } });
   page.addEventListener('dragleave', (e) => { if (e.target === page) page.classList.remove('drop'); });
   page.addEventListener('drop', async (e) => {
     if (!e.dataTransfer?.files?.length) return;
     e.preventDefault(); page.classList.remove('drop');
+    if (viewAs) return alert(`You're viewing Cue as ${viewAs.name}, so nothing can be changed. Exit View as first.`);
     const r = await window.cue.dropFiles(c.id, [...e.dataTransfer.files]);
     if (!r.ok) alert(r.error); loadFiles();
   });
@@ -604,7 +626,7 @@ let presetEditing = null;
 
 // Teammates can read the presets; only the admin edits them.
 async function renderPresets() {
-  const locked = !!authState.user && authState.user.role === 'member';
+  const locked = !!viewer() && viewer().role === 'member';
   if (locked && presetEditing === '__ai') presetEditing = null;
   const fresh = pageTicket();
   await renderPresetsInner();
@@ -714,7 +736,7 @@ async function renderPresetsInner() {
   const move = (arr, i, d) => { const j = i + d; if (j < 0 || j >= arr.length) return; [arr[i], arr[j]] = [arr[j], arr[i]]; touch(); renderPresets(); };
 
   // See it on a call: a step-by-step preview of the card, or a full AI test call.
-  const isAdmin = !authState.user || authState.user.role === 'admin';
+  const isAdmin = !authState.user || viewer().role === 'admin';
   const tryOut = h('div', { class: 'test-out' });
   const tryPanel = h('div', { class: 'panel try-panel' },
     h('div', { class: 'try-head' },
@@ -857,13 +879,13 @@ async function renderSettings() {
   const mod = info.platform === 'darwin' ? 'Cmd' : 'Ctrl';
 
   const team = isClientUser() ? await clientSettingsPanels() : await teamSettingsPanels(s);
-  const locked = !!authState.user && authState.user.role === 'member';
+  const locked = !!viewer() && viewer().role === 'member';
   if (!fresh()) return;
   $view.replaceChildren(
     h('h1', { class: 'page' }, 'Settings'),
     h('p', { class: 'sub' }, isClientUser() ? 'Your account and how Cue listens to your calls.' : WEB ? 'Cue on the web: everything except recording calls. Recording, the call widget and audio live in the desktop app.' : 'Keys are stored encrypted on this computer and only sent to ElevenLabs and Anthropic.'),
     locked ? h('div', { class: 'banner' }, 'Only Dylan can change Cue’s settings. You can pick your own theme.') : null,
-    authState.user?.role === 'admin' ? h('button', { class: 'banner banner-link', onclick: () => go({ view: 'admin' }) },
+    viewer()?.role === 'admin' ? h('button', { class: 'banner banner-link', onclick: () => go({ view: 'admin' }) },
       h('span', { html: ICON.shield, style: 'display:inline-grid;width:16px;height:16px' }),
       h('span', { class: 'grow' }, h('b', {}, 'Team settings are on the Admin page'), ' · coaching, playbook, presets, devices, calendars, share links, keys and the simulator'),
       h('span', {}, 'Open →')) : null,
@@ -879,7 +901,7 @@ async function renderSettings() {
           h('span', { class: 's2' }, h('i', { style: `width:70%;background:${a};opacity:.8` }), h('i', { style: `width:90%;background:${a};opacity:.25` }), h('i', { style: `width:40%;background:${b}` }))),
         label)))),
     ...team,
-    authState.user?.role === 'admin' || isClientUser() ? null : await keysPanel(s, keyInput, save, out),
+    viewer()?.role === 'admin' || isClientUser() ? null : await keysPanel(s, keyInput, save, out),
     WEB ? null : h('div', { class: 'panel' }, h('h3', {}, 'Audio'),
       field('Microphone', micSelect),
       field('Language', h('select', { onchange: (e) => save({ language: e.target.value }) },
@@ -922,7 +944,7 @@ async function renderSettings() {
 // ---------------------------------------------------------------------------
 
 let routedByMain = false;
-window.cue.on('route', (r) => { routedByMain = true; go(r); });
+window.cue.on('route', (r) => { routedByMain = true; if (viewAs) exitViewAs(false); go(r); });
 // Typing in a call's notes or title: don't redraw the page under you (it would drop the
 // caret and could show an older copy). Redraw only when the call itself moved on, e.g.
 // "Writing notes…" became the notes.
@@ -937,7 +959,7 @@ window.cue.on('calls:changed', async (p) => {
   if (c && route.view === 'call' && route.id === id && c.status !== $view.dataset.status) renderCall(id);
 });
 window.cue.on('team:changed', () => { renderList(); renderTeamLive(); });
-window.cue.on('auth:changed', async () => { if (typeof tabMemo !== 'undefined') tabMemo.clear(); authState = await call('auth:state'); loadTeamEmails(); renderAccount(); renderNav(); renderTeamLive(); renderFolders(); presetsChanged(); renderView(); });
+window.cue.on('auth:changed', async () => { if (typeof tabMemo !== 'undefined') tabMemo.clear(); authState = await rawCall('auth:state'); viewAsCheckAccount(); loadTeamEmails(); renderAccount(); renderNav(); renderTeamLive(); renderFolders(); presetsChanged(); renderView(); });
 window.cue.on('computers:changed', () => { if (route.view === 'settings' || route.view === 'admin') renderView(); });
 window.cue.on('monitor:event', (e) => onMonitorEvent(e));
 window.cue.on('settings:changed', (s) => { applyTheme(s.theme); if (route.view === 'settings') renderSettings(); });
@@ -968,6 +990,7 @@ window.cue.on('live:state', (st) => {
   if (st?.preview) return; // the preset preview only drives the call card
   const wasLive = liveState?.mode === 'live';
   liveState = st;
+  if (viewAs && !wasLive && st?.mode === 'live') exitViewAs(); // a call starting on this computer: back to your own Cue
   renderStart();
   if (route.view === 'live') renderLive(false);
   if (wasLive !== (st.mode === 'live')) renderList();

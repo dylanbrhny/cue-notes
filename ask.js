@@ -126,5 +126,5 @@ function renderAsk() {
   $view.replaceChildren(
     h('h1', { class: 'page' }, 'Ask Cue'),
     h('p', { class: 'hint', style: 'margin:0 0 18px;color:var(--text-3)' }, 'Ask about any call the team has had. Cue searches the notes and transcripts and answers with where it found it. Private calls stay private.'),
-    askPanel());
+    viewAs ? h('p', { class: 'hint' }, `Ask is off while you’re viewing Cue as ${viewAs.name}: it would answer from your calls, not theirs.`) : askPanel());
 }

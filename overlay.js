@@ -28,6 +28,7 @@ let showList = false;          // full checklist instead of just the next beat
 let objMore = false;           // show every line of the objection answer
 let showBook = false;          // the objection playbook
 let bookOpen = null;           // which playbook entry is open
+let showBrief = false;         // the prospect brief, opened from its one-line strip
 let level = 0;
 
 const ICON = {
@@ -39,6 +40,8 @@ const ICON = {
   stop: '<svg viewBox="0 0 14 14" fill="none"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6" fill="currentColor"/></svg>',
   x: '<svg viewBox="0 0 14 14" fill="none"><path d="M4 4l6 6M10 4l-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
   target: '<svg viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.4"/><circle cx="7" cy="7" r="1.8" fill="currentColor"/></svg>',
+  skip: '<svg viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="4.6" stroke="currentColor" stroke-width="1.4"/><path d="M3.8 10.2l6.4-6.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+  back: '<svg viewBox="0 0 14 14" fill="none"><path d="M5.5 4L3 6.5 5.5 9M3.3 6.5H8a3 3 0 0 1 0 6H6.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   notes: '<svg viewBox="0 0 14 14" fill="none"><rect x="2.5" y="2" width="9" height="10" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M5 5.5h4M5 8h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
 };
 
@@ -74,12 +77,12 @@ document.addEventListener('mouseup', () => {
 });
 
 function structureKey() {
-  const base = [state.mode, state.collapsed, state.idleOpacity, showList, objMore, !!justDone];
+  const base = [state.mode, state.collapsed, state.idleOpacity, showList, objMore, !!justDone, showBrief];
   if (state.mode !== 'live') return JSON.stringify([...base, state.app, state.title, state.presets, state.event && state.event.title, state.dreamScore]);
   const s = state.snapshot;
   return JSON.stringify([...base, state.callMode, state.title, state.warning, state.setupWarning, s.presetName, state.askEnd && state.askEnd.at, state.sharingWhole, state.shareTip,
     s.teamNudge && s.teamNudge.at, s.pitchNudge && s.pitchNudge.at,
-    s.items.map((i) => [i.id, i.done]), s.goodNow, state.winHint, state.talk && [state.talk.me, state.talk.lately], state.coachNudge && state.coachNudge.at, showBook, bookOpen, s.objection && [s.objection.id, s.objection.at]]);
+    s.items.map((i) => [i.id, i.done, i.skipped, i.say]), s.goodNow, s.brief, state.prepping, state.winHint, state.talk && [state.talk.me, state.talk.lately], state.coachNudge && state.coachNudge.at, showBook, bookOpen, s.objection && [s.objection.id, s.objection.at]]);
 }
 
 function update() {
@@ -96,7 +99,12 @@ function render() {
   const phase = asking ? 'ask' : state.mode === 'live' ? `live-${state.callMode}-${pill ? 'pill' : 'card'}` : state.mode;
   card.className = ['card', state.mode === 'idle' && 'hidden', pill && 'pill', (Date.now() < awakeUntil || state.mode !== 'live') && 'awake'].filter(Boolean).join(' ');
   if (phase !== lastPhase) { lastPhase = phase; card.classList.remove('swap'); void card.offsetWidth; card.classList.add('swap'); }
+  // Lists that scroll inside the card keep their place when the card is redrawn (talk time
+  // changes every few seconds).
+  const keep = {};
+  for (const c of ['list', 'brief-lines', 'book']) { const el = card.querySelector(`.${c}`); if (el && el.scrollTop) keep[c] = el.scrollTop; }
   card.replaceChildren(...(views[state.mode] || (() => []))());
+  for (const [c, top] of Object.entries(keep)) { const el = card.querySelector(`.${c}`); if (el) el.scrollTop = top; }
   requestAnimationFrame(reportSize);
 }
 
@@ -144,7 +152,7 @@ const views = {
       });
     }
     const s = state.snapshot;
-    const open = s.items.filter((i) => !i.done);
+    const open = s.items.filter((i) => !i.done && !i.skipped);
     if (state.callMode === 'notes') {
       return [h('div', { class: 'pill-in' },
         h('img', { class: 'mark', src: 'assets/logo.svg', alt: '' }),
@@ -176,6 +184,7 @@ const views = {
     if (showBook) { parts.push(playbook()); return parts; }
     if (s.pitchNudge && !s.teamNudge) parts.push(h('div', { class: 'pitch', role: 'status' }, h('span', { class: 'pitch-ico', html: ICON.target }), h('span', { class: 'grow' }, s.pitchNudge), ib('x', 'Dismiss', () => call('call:dismiss-nudge'))));
     if (s.objection) parts.push(objection(s.objection));
+    else if (s.brief || state.prepping) parts.push(briefStrip(s.brief));
     if (showList) parts.push(fullList(s));
     else if (!s.objection) parts.push(nextBeat(open));
     return parts;
@@ -239,10 +248,10 @@ function header(s) {
     h('img', { class: 'mark', src: 'assets/logo.svg', alt: '' }),
     statusDot(),
     s.total <= 10
-      ? h('span', { class: 'dots', title: `${s.done} of ${s.total} beats covered, in any order` }, s.items.map((_, k) => h('i', { class: k < s.done ? 'on' : '' })))
+      ? h('span', { class: 'dots', title: `${s.done} of ${s.total} beats covered, in any order${s.skippedCount ? ` (${s.skippedCount} not for this call)` : ''}` }, s.items.filter((i) => !i.skipped).map((_, k) => h('i', { class: k < s.done ? 'on' : '' })))
       : h('span', { class: 'count', style: 'flex:1' }, `${s.done}/${s.total}`),
     h('span', { class: 'time', 'data-elapsed': s.startedAt }, fmt(Date.now() - s.startedAt)),
-    ib(showList ? 'up' : 'list', showList ? 'Show fewer beats' : 'Show every beat', () => { showList = !showList; showBook = false; render(); }),
+    ib(showList ? 'up' : 'list', showList ? 'Show fewer beats' : 'Show every beat', () => { showList = !showList; showBook = false; if (showList) showBrief = false; render(); }),
     (state.playbook || []).length ? ib('book', showBook ? 'Close the playbook' : 'Objection playbook', () => { showBook = !showBook; showList = false; render(); }) : null,
     ib('notes', 'Open notes', () => call('overlay:open-main', { view: 'live' })),
     ib('min', 'Shrink', () => call('overlay:collapse', true)),
@@ -261,7 +270,8 @@ function nextBeat(open) {
   const rest = open.filter((i) => i !== good);
   const line = (i, main) => h('div', { class: `beat ${main ? '' : 'small'}` },
     h('button', { class: 'tick', title: 'Tick it by hand', 'aria-label': `Tick: ${i.label}`, html: ICON.check, onclick: () => call('call:toggle', i.id) }),
-    h('span', { class: 'txt', title: i.label }, i.label));
+    h('span', { class: 'txt', title: i.say ? `${i.label}\nFor them: ${i.say}` : i.label }, i.label, main && i.say ? h('span', { class: 'say' }, i.say) : null),
+    skipBtn(i));
   return h('div', { class: 'next' },
     good ? h('div', { class: 'label good' }, 'Good moment to') : h('div', { class: 'label' }, `Still to cover · ${open.length}`),
     good ? line(good, true) : null,
@@ -270,13 +280,39 @@ function nextBeat(open) {
     (good ? rest.length > 2 : rest.length > 3) ? h('div', { class: 'then' }, `+${rest.length - (good ? 2 : 3)} more`) : null);
 }
 
+// "Not for this call": the beat leaves the count (bring it back from the full list).
+function skipBtn(i) {
+  return h('button', { class: 'skip', title: 'Not for this call (doesn’t count against you)', 'aria-label': `Not for this call: ${i.label}`, html: ICON.skip,
+    onclick: (e) => { e.stopPropagation(); call('call:skip', { id: i.id, skip: true }); } });
+}
+
 function fullList(s) {
-  const ordered = [...s.items.filter((i) => !i.done), ...s.items.filter((i) => i.done)];
-  return h('ul', { class: 'list' }, ordered.map((i) => h('li', {
+  const open = s.items.filter((i) => !i.done && !i.skipped);
+  const done = s.items.filter((i) => i.done && !i.skipped);
+  const skipped = s.items.filter((i) => i.skipped);
+  const row = (i) => h('li', {
     class: ['row', i.done && 'done', i.id === s.goodNow && 'is-next'].filter(Boolean).join(' '),
-    title: i.done ? (i.evidence ? `Covered: "${i.evidence}"` : 'Covered') : 'Click to tick by hand',
+    title: i.done ? (i.evidence ? `Covered: "${i.evidence}"` : 'Covered') : `Click to tick by hand${i.say ? `\nFor them: ${i.say}` : ''}`,
     onclick: () => call('call:toggle', i.id),
-  }, h('span', { class: 'box', html: ICON.check }), h('span', { class: 't' }, i.label))));
+  }, h('span', { class: 'box', html: ICON.check }), h('span', { class: 't' }, i.label, !i.done && i.say ? h('span', { class: 'say' }, i.say) : null), i.done ? null : skipBtn(i));
+  return h('ul', { class: 'list' },
+    [...open, ...done].map(row),
+    skipped.length ? h('li', { class: 'list-head' }, `Not for this call · ${skipped.length}`) : null,
+    skipped.map((i) => h('li', { class: 'row skipped', title: `${i.skipReason || 'Not for this call'}${i.skipBy === 'manual' ? '' : ' (Cue’s call: bring it back if it fits)'}` },
+      h('span', { class: 't' }, h('span', { class: 'lbl' }, i.label), h('span', { class: 'why' }, i.skipBy === 'manual' ? (i.skipReason ? `You: ${i.skipReason}` : 'You set this aside') : `Cue: ${i.skipReason || 'doesn’t fit this call'}`)),
+      h('button', { class: 'bring', title: 'Bring it back', 'aria-label': `Bring back: ${i.label}`, onclick: (e) => { e.stopPropagation(); call('call:skip', { id: i.id, skip: false }); } }, h('span', { html: ICON.back }), 'Bring back'))));
+}
+
+// Who they are, from the prep before the call (their website and our past calls).
+function briefStrip(b) {
+  if (!b) return h('div', { class: 'brief pending' }, h('span', { class: 'spin-s' }), 'Fitting the beats to this prospect…');
+  const first = b.lines[0] || b.headsUp[0] || '';
+  return h('div', { class: `brief ${showBrief ? 'open' : ''}` },
+    h('button', { class: 'brief-top', 'aria-expanded': String(showBrief), title: showBrief ? 'Hide' : 'About them, from their website and past calls', onclick: () => { showBrief = !showBrief; if (showBrief) showList = false; render(); } },
+      h('span', { class: 'brief-k' }, b.name || b.domain || 'About them'),
+      h('span', { class: 'brief-one' }, showBrief ? '' : first),
+      h('span', { class: 'brief-chev', html: ICON.up })),
+    showBrief ? h('ul', { class: 'brief-lines' }, b.lines.map((l) => h('li', {}, l)), b.headsUp.map((l) => h('li', { class: 'heads' }, l))) : null);
 }
 
 function objection(o) {
@@ -326,6 +362,7 @@ window.cue.on('overlay:state', (next) => {
     lastObjectionAt = null;
     justDone = null;
     showList = false;
+    showBrief = false;
   }
   if (next.mode !== 'prompt') selectedPreset = null;
   state = next;

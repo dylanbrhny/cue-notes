@@ -306,7 +306,7 @@ async function renderAdmin() {
   const fresh = pageTicket();
   if (authState.user?.role !== 'admin') return go({ view: 'settings' });
   const panels = [];
-  panels.push(await simulatorPanel(), await devicesPanel(), await clientsPanel(), await contextPanel(), await adminPanel());
+  panels.push(await viewAsPanel(), await simulatorPanel(), await devicesPanel(), await clientsPanel(), await contextPanel(), await adminPanel());
 
   // Who we are + how we sell
   const ws = await call('workspace:get');
@@ -362,6 +362,7 @@ async function keysPanel(s, keyInput, save, out) {
     e.target.disabled = true; out.textContent = 'Testing…';
     const r = await call('settings:test');
     e.target.disabled = false;
+    if (!r || r.ok === false) { out.textContent = r?.error || 'Couldn’t test the keys.'; return; }
     const line = (name, v) => h('div', {}, `${name}: `, h('span', { class: v === 'ok' ? 'ok' : 'bad' }, v === 'ok' ? 'working' : v));
     out.replaceChildren(line('ElevenLabs', r.elevenlabs), line('Anthropic', r.anthropic));
   } }, 'Test keys'), out);
@@ -555,6 +556,7 @@ async function clientsPanel() {
     out,
     ...[...byOrg.entries()].map(([k, users]) => h('div', { class: 'client-org' }, h('b', {}, orgName(k)),
       users.map((u) => h('div', { class: 'ctx-row' }, h('span', { class: `dot ${u.last_sign_in_at ? 'ok' : ''}` }), h('span', { class: 'grow' }, `${u.name || u.email} · ${u.email} · ${ago(u.last_sign_in_at)}`),
+        viewAsButton({ id: u.id, name: u.name || u.email, email: u.email, role: 'client', org: orgName(u.org_key) }),
         h('button', { class: 'link-btn', onclick: async () => { const r = await call('clients:invite', { name: u.name, email: u.email, orgKey: u.org_key, orgName: orgName(u.org_key) }); if (r.ok) showInvite(r, u); else out.textContent = r.error; } }, 'New code'),
         h('button', { class: 'link-btn danger', onclick: async () => { if (!confirm(`Remove ${u.email}? They're signed out and can't sign in again. Their recorded calls stay with the team.`)) return; const r = await call('clients:remove', u.email); if (!r.ok) return alert(r.error); renderView(); } }, 'Remove'))))));
 }
@@ -608,7 +610,11 @@ async function coachingPanel() {
       h('label', { class: 'coach-cell' }, h('span', {}, 'Longest monologue'), h('span', { class: 'coach-pct' }, num(c.monologue_seconds, 20, 300, (v) => save({ monologue_seconds: v })), 's')),
       h('label', { class: 'coach-cell' }, h('span', {}, 'In discovery'), h('span', { class: 'coach-pct' }, num(c.discovery_monologue_seconds, 15, 300, (v) => save({ discovery_monologue_seconds: v })), 's')),
       h('label', { class: 'coach-cell' }, h('span', {}, 'Fastest pace'), h('span', { class: 'coach-pct' }, num(c.pace_wpm, 120, 260, (v) => save({ pace_wpm: v })), 'wpm')),
-      h('label', { class: 'coach-cell' }, h('span', {}, 'Time between tips'), h('span', { class: 'coach-pct' }, num(c.nudge_cooldown_seconds, 30, 600, (v) => save({ nudge_cooldown_seconds: v })), 's'))));
+      h('label', { class: 'coach-cell' }, h('span', {}, 'Time between tips'), h('span', { class: 'coach-pct' }, num(c.nudge_cooldown_seconds, 30, 600, (v) => save({ nudge_cooldown_seconds: v })), 's'))),
+    h('label', { class: 'toggle', style: 'margin-top:14px' },
+      h('input', { type: 'checkbox', checked: c.prospect_research !== false, onchange: (e) => save({ prospect_research: e.target.checked }) }),
+      h('span', { class: 'tx' }, h('b', {}, 'Research the prospect before coaching calls'),
+        h('span', {}, 'A few minutes before the call, Cue reads their website and the team’s past calls with them, words each beat for them, and sets aside beats that clearly don’t fit. The rep can bring any back.'))));
 }
 
 async function shareDomainPanel() {
@@ -637,6 +643,7 @@ async function adminPanel() {
       h('span', { class: 'grow' }, h('b', {}, m.name), h('span', {}, ` ${m.email}`)),
       h('span', { class: 'chip' }, m.role === 'admin' ? 'Admin' : 'Member'),
       h('span', { class: 'saved', style: 'min-width:70px;text-align:right' }, m.joinedAt ? 'signed in' : 'not yet'),
+      viewAsButton({ id: m.id, name: m.name, email: m.email, role: m.role }),
       m.email === authState.user?.email ? null : h('button', { class: 'link-btn danger', onclick: async () => {
         if (!confirm(`Remove ${m.name} from the team? Their calls stay; they lose access.`)) return;
         const r = await call('team:removeMember', m.email); if (!r.ok) alert(r.error); renderView();
@@ -919,8 +926,8 @@ async function renderWins() {
     h('p', { class: 'sub' }, 'Won sales calls next to lost ones: which habits actually go with closing. Outcomes come from Salesforce by themselves, and client calls (reviews, onboarding) are left out.'),
     h('div', { class: 'wins-sync' }, h('span', { class: `dot ${w.sync.running ? 'busy' : w.sync.error ? 'bad' : 'ok'}` }),
       w.sync.running ? `Updating from Salesforce… ${w.sync.analyzed ? `${w.sync.analyzed} calls read so far, ` : ''}numbers fill in as calls are read` : w.sync.error ? `Last update failed: ${w.sync.error}` : `Updated from Salesforce ${ago(w.sync.at)}${w.sync.web ? '' : ' · every 6 hours'}`,
-      !WEB && authState.user?.role === 'admin' && !w.sync.running ? h('button', { class: 'link-btn', onclick: async () => { await call('wins:sync'); setTimeout(renderWins, 300); } }, 'Update now') : null,
-      !WEB && authState.user?.role === 'admin' && w.sync.running ? h('button', { class: 'link-btn', title: 'Stop this update and start again (calls already read are kept)', onclick: async (e) => { e.target.disabled = true; e.target.textContent = 'Restarting…'; await call('wins:restart'); setTimeout(renderWins, 500); } }, 'Restart') : null),
+      !WEB && viewer()?.role === 'admin' && !w.sync.running ? h('button', { class: 'link-btn', onclick: async () => { await call('wins:sync'); setTimeout(renderWins, 300); } }, 'Update now') : null,
+      !WEB && viewer()?.role === 'admin' && w.sync.running ? h('button', { class: 'link-btn', title: 'Stop this update and start again (calls already read are kept)', onclick: async (e) => { e.target.disabled = true; e.target.textContent = 'Restarting…'; await call('wins:restart'); setTimeout(renderWins, 500); } }, 'Restart') : null),
     h('div', { class: 'wins-sum' },
       h('div', { class: 'ws won' }, h('b', {}, hs.won), h('span', {}, 'won sales calls')),
       h('div', { class: 'ws lost' }, h('b', {}, hs.lost), h('span', {}, `lost · ${open} still open`)),
@@ -969,7 +976,7 @@ async function renderArchive() {
 async function renderTrash() {
   const fresh = pageTicket();
   const list = await call('trash:list');
-  const admin = authState.user?.role === 'admin';
+  const admin = viewer()?.role === 'admin';
   const days = (t) => Math.max(0, Math.ceil((t - Date.now()) / 86_400_000));
   const rows = list.map((m) => h('div', { class: 'trash-row' },
     h('span', { class: 'grow' },
@@ -1027,7 +1034,7 @@ async function renderFolder(id) {
       } }, 'Delete')),
     meetings.length ? h('div', { class: 'folder-list' }, out) : h('div', { class: 'placeholder' }, 'No calls here yet. Drag a call from the sidebar onto this folder, or pick the folder at the top of a call.'),
     // Ask about every call in this folder (and the folders inside it), like Granola's folder chat.
-    meetings.length && authState.user && !isClientUser() ? h('div', { class: 'ask-dock' }, askPanel({ folderId: id, folderName: f.name, compact: true, dock: true })) : null,
+    meetings.length && authState.user && !isClientUser() && !viewAs ? h('div', { class: 'ask-dock' }, askPanel({ folderId: id, folderName: f.name, compact: true, dock: true })) : null,
   );
 }
 

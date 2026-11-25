@@ -977,3 +977,22 @@ h1.page, .title-input { font-family: var(--font); font-size: 24px; line-height: 
 .banner.paused { border-color: var(--line-2); background: var(--bg-hover); color: var(--text); }
 .meta-person { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; text-decoration: underline dotted var(--text-3); text-underline-offset: 3px; }
 .meta-person:hover { color: var(--text); text-decoration-color: currentColor; }
+
+/* View as (Admin): a bar across the top of the page while previewing Cue as someone else */
+.viewas-bar { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; gap: 10px; padding: 9px 16px 9px 18px; font-size: 13px; color: var(--text); background: color-mix(in srgb, var(--accent) 11%, var(--bg)); border-bottom: 1px solid var(--accent-line, var(--line-2)); box-shadow: 0 4px 14px -8px rgba(0, 0, 0, 0.25); }
+.viewas-bar .grow { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.viewas-meta { color: var(--text-2); }
+.viewas-eye { display: grid; place-items: center; color: var(--accent); }
+.viewas-eye svg { width: 17px; height: 17px; }
+.viewas-exit { border: 0; background: var(--accent); color: #fff; font: inherit; font-size: 12.5px; font-weight: 600; padding: 5px 14px; border-radius: 999px; cursor: pointer; }
+.viewas-exit:hover { filter: brightness(1.08); }
+body.viewing-as #main { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
+
+/* Checklist beats that weren't for this call, and the line to say for this prospect */
+.checks .grow { flex: 1; min-width: 0; }
+.checks .say { display: block; font-size: 12.5px; color: var(--text-2); margin-top: 2px; }
+.checks li.skipped .label { color: var(--text-3); text-decoration: line-through; text-decoration-color: var(--line-2); }
+.checks li.skipped .ev { font-style: normal; }
+.checks .box.skip-box { border-style: dashed; }
+.checks .skip-link { flex: none; align-self: center; opacity: 0; transition: opacity 0.12s; }
+.checks li:hover .skip-link, .checks .skip-link:focus-visible { opacity: 1; }

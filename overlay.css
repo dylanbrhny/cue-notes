@@ -33,7 +33,7 @@ body.snap { background: #d9d6cf; }
 }
 .card.hidden { display: none; }
 .card.pill { border-radius: 999px; }
-.ib, .tick, .row, .go, .ghost, select, .more, .links button, .warn-line { -webkit-app-region: no-drag; }
+.ib, .tick, .row, .skip, .brief-top, .bring, .list, .go, .ghost, select, .more, .links button, .warn-line { -webkit-app-region: no-drag; }
 
 /* ---- header ------------------------------------------------------------- */
 .bar {
@@ -248,3 +248,39 @@ body.snap { background: #d9d6cf; }
 .talk-bar i { overflow: hidden; }
 .talk-aim { position: absolute; top: -3px; width: 2px; height: 10px; border-radius: 1px; background: rgba(255,255,255,0.55); transform: translateX(-1px); }
 .win-hint { font-size: 11px; color: var(--mint); opacity: .85; margin: -2px 0 6px 26px; }
+
+/* Beats that don't fit this call: a small skip button by each open beat, and a group at the
+   bottom of the full list to bring them back. */
+.beat { align-items: flex-start; }
+.beat .txt { flex: 1; min-width: 0; }
+.say { display: block; margin-top: 2px; font-size: 11.5px; font-weight: 500; line-height: 1.35; color: var(--ink-2); }
+.beat.small .txt { flex: 1; }
+.skip { flex: none; width: 18px; height: 18px; margin-top: 0; border: 0; border-radius: 5px; background: transparent; color: var(--ink-3); display: grid; place-items: center; cursor: pointer; opacity: 0.55; transition: opacity 0.12s, background 0.12s, color 0.12s; }
+.skip svg { width: 12px; height: 12px; }
+.beat:hover .skip, .row:hover .skip, .skip:focus-visible { opacity: 1; }
+.skip:hover { background: var(--hud-hover); color: var(--ink); }
+.row .t { flex: 1; min-width: 0; }
+.row .say { color: var(--ink-3); }
+.list-head { list-style: none; margin: 8px 6px 2px; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+.row.skipped { cursor: default; color: var(--ink-3); }
+.row.skipped .lbl { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--ink-3) 60%, transparent); }
+.row.skipped .why { display: block; font-size: 11px; margin-top: 1px; color: var(--ink-2); }
+.bring { flex: none; display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--hud-line, rgba(255,255,255,0.14)); background: transparent; color: var(--ink-2); font: inherit; font-size: 11px; padding: 2px 7px; border-radius: 999px; cursor: pointer; }
+.bring svg { width: 11px; height: 11px; display: block; }
+.bring:hover { color: var(--ink); background: var(--hud-hover); }
+/* About them: one line from the prep, opens to the full brief */
+.brief { margin: 0 10px 6px; border-radius: 9px; background: var(--hud-hover); font-size: 12px; }
+.brief.pending { display: flex; align-items: center; gap: 7px; padding: 6px 10px; color: var(--ink-3); }
+.spin-s { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--ink-3); border-top-color: transparent; animation: spin 0.8s linear infinite; flex: none; }
+.brief-top { display: flex; align-items: center; gap: 7px; width: 100%; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; padding: 6px 8px 6px 10px; cursor: pointer; }
+.brief-k { flex: none; font-weight: 600; color: var(--ink); max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brief-one { flex: 1; min-width: 0; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brief-chev { flex: none; display: grid; place-items: center; color: var(--ink-3); transform: rotate(180deg); transition: transform 0.15s; }
+.brief-chev svg { width: 12px; height: 12px; }
+.brief.open .brief-chev { transform: none; }
+.brief-lines { margin: 0; padding: 0 10px 8px 24px; color: var(--ink-2); line-height: 1.4; display: grid; gap: 3px; }
+.brief-lines .heads { color: var(--amber, #e0a63a); }
+/* The full list scrolls inside the card (like the playbook) instead of running past the window */
+.list { max-height: 420px; overflow-y: auto; }
+.brief-lines { max-height: 220px; overflow-y: auto; -webkit-app-region: no-drag; }
+.obj ~ .list { max-height: 230px; }

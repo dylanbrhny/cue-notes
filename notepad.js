@@ -198,7 +198,7 @@ function notepad(c, { onSaved, extra = null, transcript = null, names } = {}) {
 
     if (view === 'transcript' && transcript) { wrap.replaceChildren(tabs, drawTranscript()); return; }
     if (view === 'notes' && c.aiNotes) {
-      const editor = h('div', { class: 'notepad md', contenteditable: 'true', spellcheck: 'true', html: renderMd(c.aiNotes) });
+      const editor = h('div', { class: 'notepad md', contenteditable: viewAs ? 'false' : 'true', spellcheck: 'true', html: renderMd(c.aiNotes) });
       paint(editor);
       editor.addEventListener('input', (e) => {
         // After this input is done (a list can't be made in the middle of another edit).
