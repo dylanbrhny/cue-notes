@@ -150,8 +150,10 @@ document.addEventListener('click', () => { if (menuOpen) { menuOpen = false; ren
 function presetsChanged() { presetsCache = null; startKey = ''; renderStart(); }
 
 function renderNav() {
+  // Companies, People and Files are tabs of Home, so Home stays lit on them.
+  const HOME_TABS = ['home', 'companies', 'company', 'people', 'person', 'files'];
   const item = (view, label, icon) => h('button', {
-    class: `nav-item ${route.view === view ? 'on' : ''}`,
+    class: `nav-item ${route.view === view || (view === 'home' && HOME_TABS.includes(route.view)) ? 'on' : ''}`,
     onclick: () => go({ view }),
   }, h('span', { html: ICON[icon], style: 'display:inline-grid' }), label);
   // Live is always there; it glows (with a count) while anyone on the team is on a call.
@@ -210,9 +212,29 @@ async function renderList() {
 // Router
 // ---------------------------------------------------------------------------
 
+// Pages load their data, then paint. A page still loading when the user moves on must
+// not paint over (or reach into) the page they moved to: each render takes a ticket
+// and gives up once a newer render has started.
+let pageSeq = 0;
+const pageTicket = () => { const n = pageSeq; return () => n === pageSeq; };
+
+// A new page rises in once its content is there, and the scroll goes back to the top at
+// the same moment. Doing either on the old page while the new one loaded made the old
+// tab play again before the new one showed.
+let pageEnter = null; // set while a new page is on its way
+new MutationObserver(() => {
+  if (!pageEnter) return;
+  const kids = [...$view.children];
+  if (!kids.length) return;
+  if (pageEnter.scroll) { document.getElementById('main').scrollTop = 0; pageEnter.scroll = false; }
+  if (kids.every((k) => k.classList.contains('placeholder'))) return; // still loading: rise with the content
+  pageEnter = null;
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  for (const k of kids) k.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 200, easing: 'ease', fill: 'backwards' });
+}).observe($view, { childList: true });
+
 function go(r) {
   if (route.view === 'monitor' && (r.view !== 'monitor' || r.id !== route.id)) stopMonitor();
-  if (r.view !== route.view || r.id !== route.id) document.getElementById('main').scrollTop = 0;
   route = r;
   renderNav();
   renderList();
@@ -242,13 +264,14 @@ function renderWaiting() {
 
 async function renderView() {
   const v = route.view;
+  pageSeq += 1;
   // The saved sign-in is still loading: don't flash the sign-in page.
   if (authState.restoring && v !== 'signin') { $view.replaceChildren(h('div', { class: 'placeholder' }, h('span', { class: 'spin' }), 'Opening Cue…')); return; }
   if (deviceBlocked() && v !== 'signin') return renderWaiting();
-  if ($view.dataset.view !== v || $view.dataset.id !== String(route.id || '')) { $view.classList.remove('enter'); void $view.offsetWidth; $view.classList.add('enter'); }
+  if ($view.dataset.view !== v || $view.dataset.id !== String(route.id || '')) pageEnter = { scroll: true };
   $view.dataset.view = v;
   $view.dataset.id = String(route.id || '');
-  if (v === 'live') { liveState = await call('call:state'); renderList(); return renderLive(true); }
+  if (v === 'live') { const fresh = pageTicket(); liveState = await call('call:state'); if (!fresh()) return; renderList(); return renderLive(true); }
   if (v === 'call') return renderCall(route.id);
   if (v === 'monitor') return renderMonitor(route.id);
   if (v === 'watch') return renderWatch();
@@ -275,9 +298,11 @@ async function renderView() {
 // ---------------------------------------------------------------------------
 
 async function renderHome() {
+  const fresh = pageTicket();
   if (authState.configured && !authState.user && !sessionStorage.getItem('cue-offline')) return renderSignIn();
   if (authState.user) return renderNotesTab();
   const s = await call('settings:get');
+  if (!fresh()) return;
   const needsKeys = !s.anthropicKey || !s.elevenlabsKey;
   const kids = [];
   if (needsKeys) {
@@ -408,7 +433,9 @@ setInterval(() => {
 // ---------------------------------------------------------------------------
 
 async function renderCall(id) {
+  const fresh = pageTicket();
   const c = await call('calls:get', id);
+  if (!fresh()) return;
   if (!c) return go({ view: 'home' });
   if (c.status === 'live' && liveState?.mode === 'live' && liveState.callId === id) return go({ view: 'live' });
 
@@ -493,6 +520,7 @@ async function renderCall(id) {
     const r = await window.cue.dropFiles(c.id, [...e.dataTransfer.files]);
     if (!r.ok) alert(r.error); loadFiles();
   });
+  if (!fresh()) return;
   $view.replaceChildren(page);
 }
 
@@ -506,8 +534,9 @@ let presetEditing = null;
 async function renderPresets() {
   const locked = !!authState.user && authState.user.role === 'member';
   if (locked && presetEditing === '__ai') presetEditing = null;
+  const fresh = pageTicket();
   await renderPresetsInner();
-  if (!locked) return;
+  if (!locked || !fresh()) return;
   $view.querySelectorAll('.ai-tab').forEach((el) => el.remove());
   $view.querySelectorAll('.preset-tab').forEach((el) => { if (/New preset/.test(el.textContent)) el.remove(); });
   $view.querySelectorAll('input, select, textarea, button:not(.preset-tab):not(.allow), [contenteditable="true"]').forEach((el) => { if (el.isContentEditable) el.contentEditable = 'false'; else el.disabled = true; });
@@ -515,8 +544,10 @@ async function renderPresets() {
 }
 
 async function renderPresetsInner() {
+  const fresh = pageTicket();
   const presets = presetsCache = await call('presets:get');
   const settings = await call('settings:get');
+  if (!fresh()) return;
   if (presetEditing !== '__ai' && (!presetEditing || !presets.some((p) => p.id === presetEditing))) presetEditing = presets[0]?.id;
   const p = presets.find((x) => x.id === presetEditing);
   const savedLabel = h('span', { class: 'saved' });
@@ -729,6 +760,7 @@ function lockSettings(root) {
 }
 
 async function renderSettings() {
+  const fresh = pageTicket();
   const s = await call('settings:get');
   const presets = await call('presets:get');
   const save = (patch) => call('settings:save', patch);
@@ -754,6 +786,7 @@ async function renderSettings() {
 
   const team = isClientUser() ? await clientSettingsPanels() : await teamSettingsPanels(s);
   const locked = !!authState.user && authState.user.role === 'member';
+  if (!fresh()) return;
   $view.replaceChildren(
     h('h1', { class: 'page' }, 'Settings'),
     h('p', { class: 'sub' }, isClientUser() ? 'Your account and how Cue listens to your calls.' : WEB ? 'Cue on the web: everything except recording calls. Recording, the call widget and audio live in the desktop app.' : 'Keys are stored encrypted on this computer and only sent to ElevenLabs and Anthropic.'),

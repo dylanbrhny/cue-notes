@@ -121,9 +121,11 @@ function dreamCard(score) {
 }
 
 async function renderMonitor(id) {
+  const fresh = pageTicket();
   stopMonitor();
   $view.replaceChildren(h('div', { class: 'placeholder' }, h('span', { class: 'spin' }), 'Connecting to the call…'));
   const r = await call('monitor:open', id).catch(() => null);
+  if (!fresh()) { if (r?.meeting && route.view !== 'monitor') call('monitor:close'); return; }
   if (!r || !r.meeting) { $view.replaceChildren(h('div', { class: 'placeholder' }, 'That call isn’t available.')); return; }
   const first = (r.meeting.owner || 'Caller').split(' ')[0];
   mon = { id, meeting: r.meeting, snapshot: r.snapshot, names: { me: first, them: 'Them' } };
@@ -301,6 +303,7 @@ async function teamSettingsPanels(s) {
 // ---------------------------------------------------------------------------
 
 async function renderAdmin() {
+  const fresh = pageTicket();
   if (authState.user?.role !== 'admin') return go({ view: 'settings' });
   const panels = [];
   panels.push(await simulatorPanel(), await devicesPanel(), await clientsPanel(), await contextPanel(), await adminPanel());
@@ -325,6 +328,7 @@ async function renderAdmin() {
     onfocus: (e) => { if (e.target.value.startsWith('••••')) e.target.value = ''; },
     onchange: (e) => { const v = e.target.value.trim(); if (v) saveSetting({ [k]: v }); } });
   panels.push(await keysPanel(s, keyInput, saveSetting, h('div', { class: 'test-out' })));
+  if (!fresh()) return;
   $view.replaceChildren(
     h('h1', { class: 'page' }, 'Admin'),
     h('p', { class: 'sub' }, 'Only you see this page. Changes here apply to everyone on the team; Grant and Christian can read team settings but can’t change them.'),
@@ -951,7 +955,9 @@ function binRow(view, label, icon) {
 }
 
 async function renderArchive() {
+  const fresh = pageTicket();
   const calls = await call('calls:archived');
+  if (!fresh()) return;
   $view.replaceChildren(
     h('h1', { class: 'page' }, 'Archive'),
     h('p', { class: 'hint', style: 'margin:0 0 18px;color:var(--text-3)' }, 'Calls you archived. They’re out of Home and the folders but still show up in search and for Claude. Right-click or hover a call to bring it back.'),
@@ -959,6 +965,7 @@ async function renderArchive() {
 }
 
 async function renderTrash() {
+  const fresh = pageTicket();
   const list = await call('trash:list');
   const admin = authState.user?.role === 'admin';
   const days = (t) => Math.max(0, Math.ceil((t - Date.now()) / 86_400_000));
@@ -972,6 +979,7 @@ async function renderTrash() {
       if (!confirm(`Delete “${m.title || 'this call'}” for good? Its notes and transcript can’t be brought back.`)) return;
       const r = await call('trash:purge', [m.id]); if (!r.ok) return alert(r.error); renderTrash();
     } }, 'Delete forever')));
+  if (!fresh()) return;
   $view.replaceChildren(
     h('div', { class: 'row', style: 'align-items:flex-end;gap:12px' },
       h('h1', { class: 'page', style: 'flex:1;margin-bottom:0' }, 'Deleted'),
@@ -984,7 +992,9 @@ async function renderTrash() {
 }
 
 async function renderFolder(id) {
+  const fresh = pageTicket();
   if (!foldersCache.some((x) => x.id === id)) foldersCache = await call('folders:list');
+  if (!fresh()) return;
   const f = foldersCache.find((x) => x.id === id);
   if (!f) return go({ view: 'home' });
   const meetings = await call('folders:meetings', id);
@@ -992,6 +1002,7 @@ async function renderFolder(id) {
   const blocked = new Set([id, ...descendants(id)]);
   const parentOpts = foldersCache.filter((x) => !blocked.has(x.id)).map((x) => h('option', { value: x.id, selected: x.id === f.parentId }, folderPath(x.id)));
   await loadCompanyNames();
+  if (!fresh()) return;
   const out = callRows(meetings);
   const iconBtn = h('button', { class: 'big-icon', type: 'button', title: 'Change icon', onclick: (e) => { e.stopPropagation(); openIconPicker(e.currentTarget, { value: f.icon, onPick: saveFolderIcon(f) }); } }, cueIcon(f.icon, 30) || h('span', { class: 'folder-ico big', html: ICON.folder }));
   $view.replaceChildren(

@@ -27,7 +27,11 @@ function companyLogo(domain, name, size = 26) {
 const TABS = [['home', 'Notes', 'notesTab'], ['companies', 'Companies', 'companyTab'], ['people', 'People', 'personTab'], ['files', 'Files', 'filesTab']];
 
 function tabBar(active) {
-  return h('div', { class: 'tabs' }, TABS.map(([view, label, icon]) => h('button', { class: `tab ${active === view ? 'on' : ''}`, onclick: () => go({ view }) },
+  return h('div', { class: 'tabs' }, TABS.map(([view, label, icon]) => h('button', { class: `tab ${active === view ? 'on' : ''}`, onclick: (e) => {
+    // Show the new tab as chosen right away, even if its page takes a moment to load.
+    for (const b of e.currentTarget.parentElement.children) b.classList.toggle('on', b === e.currentTarget);
+    go({ view });
+  } },
     h('span', { class: 'tab-ico', html: ICON[icon] }), label)));
 }
 
@@ -167,6 +171,7 @@ async function comingUp() {
 }
 
 async function renderNotesTab() {
+  const fresh = pageTicket();
   const [all] = await Promise.all([call('calls:list'), loadCompanyNames()]);
   const list = h('div', { class: 'folder-list' });
   let searchSeq = 0;
@@ -195,7 +200,7 @@ async function renderNotesTab() {
   draw('');
   const client = isClientUser();
   const [nudge, soon, liveNow] = client ? [null, null, null] : await Promise.all([WEB ? null : calendarNudge(), comingUp(), liveNowSection()]);
-  if (route.view !== 'home') return; // the user moved on while this loaded
+  if (!fresh()) return; // the user moved on while this loaded
   $view.replaceChildren(client ? h('h1', { class: 'page' }, 'Your calls') : tabBar('home'), client ? null : demoCard(), liveNow, nudge, soon,
     h('div', { class: 'row tab-tools' }, searchBox('Search titles, people, notes and transcripts', draw)),
     list);
@@ -206,6 +211,7 @@ async function renderNotesTab() {
 // ---------------------------------------------------------------------------
 
 async function renderCompanies() {
+  const fresh = pageTicket();
   if (!authState.user) return $view.replaceChildren(tabBar('companies'), h('div', { class: 'placeholder' }, 'Sign in to see companies.'));
   const all = (await call('companies:list')).sort((a, b) => new Date(b.last_met) - new Date(a.last_met));
   const body = h('tbody');
@@ -219,14 +225,17 @@ async function renderCompanies() {
     if (!r.ok) alert(r.error);
     renderCompanies();
   } }, h('span', { html: ICON.sparkle, style: 'display:inline-grid;width:13px;height:13px;vertical-align:-2px;margin-right:4px' }), 'Tidy names with AI');
+  if (!fresh()) return;
   $view.replaceChildren(tabBar('companies'),
     h('div', { class: 'row tab-tools' }, searchBox('Search companies', draw), h('span', { class: 'saved' }, `${all.length} companies`), tidy),
     h('table', { class: 'ent-table' }, h('thead', {}, h('tr', {}, h('th', {}, 'Company'), h('th', { class: 'num' }, 'People'), h('th', { class: 'num' }, 'Meetings'), h('th', {}, 'Last met'))), body));
 }
 
 async function renderCompany(domain) {
+  const fresh = pageTicket();
   $view.replaceChildren(h('div', { class: 'placeholder' }, h('span', { class: 'spin' }), 'Loading…'));
   const c = await call('companies:get', domain);
+  if (!fresh()) return;
   if (!c) return go({ view: 'companies' });
   const saveName = debounce((v) => call('companies:update', { domain, patch: { name: v } }), 500);
   const saveNotes = debounce((v) => call('companies:update', { domain, patch: { notes: v } }), 500);
@@ -249,6 +258,7 @@ async function renderCompany(domain) {
 // ---------------------------------------------------------------------------
 
 async function renderPeople() {
+  const fresh = pageTicket();
   if (!authState.user) return $view.replaceChildren(tabBar('people'), h('div', { class: 'placeholder' }, 'Sign in to see people.'));
   const all = (await call('people:list')).sort((a, b) => new Date(b.last_met) - new Date(a.last_met));
   const body = h('tbody');
@@ -257,14 +267,17 @@ async function renderPeople() {
     h('td', {}, p.company ? h('span', { class: 'co-cell', onclick: (e) => { e.stopPropagation(); go({ view: 'company', id: p.domain }); } }, companyLogo(p.domain, p.company, 18), h('span', { class: 'link-like' }, p.company)) : h('span', { class: 'dim' }, '—')),
     h('td', { class: 'dim' }, p.email), h('td', { class: 'num' }, p.meetings), h('td', { class: 'dim' }, ago(p.last_met)))));
   draw('');
+  if (!fresh()) return;
   $view.replaceChildren(tabBar('people'),
     h('div', { class: 'row tab-tools' }, searchBox('Search people, emails or companies', draw), h('span', { class: 'saved' }, `${all.length} people`)),
     h('table', { class: 'ent-table' }, h('thead', {}, h('tr', {}, h('th', {}, 'Person'), h('th', {}, 'Company'), h('th', {}, 'Email'), h('th', { class: 'num' }, 'Meetings'), h('th', {}, 'Last met'))), body));
 }
 
 async function renderPerson(email) {
+  const fresh = pageTicket();
   $view.replaceChildren(h('div', { class: 'placeholder' }, h('span', { class: 'spin' }), 'Loading…'));
   const p = await call('people:get', email);
+  if (!fresh()) return;
   if (!p) return go({ view: 'people' });
   const save = (patch) => call('people:update', { email, patch });
   const saveName = debounce((v) => save({ name: v }), 500);
@@ -312,6 +325,7 @@ function fileRows(files, { showCall = true, onChange } = {}) {
 }
 
 async function renderFiles() {
+  const fresh = pageTicket();
   if (!authState.user) return $view.replaceChildren(tabBar('files'), h('div', { class: 'placeholder' }, 'Sign in to see files.'));
   const all = await call('files:list');
   const list = h('div', { class: 'file-list' });
@@ -320,6 +334,7 @@ async function renderFiles() {
     list.replaceChildren(...(shown.length ? fileRows(shown, { onChange: renderFiles }) : [h('div', { class: 'placeholder' }, all.length ? 'No files match.' : 'No files yet. Attach files to a call (open the call, then "Attach files" or drop them on it).')]));
   };
   draw('');
+  if (!fresh()) return;
   $view.replaceChildren(tabBar('files'), h('div', { class: 'row tab-tools' }, searchBox('Search files', draw), h('span', { class: 'saved' }, `${all.length} files`)), list);
 }
 
@@ -358,12 +373,15 @@ function callFilesSection(c) {
 // ---------------------------------------------------------------------------
 
 async function renderSpace(id) {
+  const fresh = pageTicket();
   if (!spacesCache.length && id !== 'mine' && id !== 'team' && id !== 'clients') spacesCache = await call('spaces:list');
+  if (!fresh()) return;
   const sp = id === 'mine' ? { id, name: 'My notes' } : id === 'team' ? { id, name: 'Team' } : id === 'clients' ? { id, name: 'Clients' } : spacesCache.find((x) => x.id === id);
   if (!sp) return go({ view: 'home' });
   const folders = typeof topFolders === 'function' ? topFolders(id) : [];
   const meetings = id === 'mine' || id === 'team' || id === 'clients' ? await call('spaces:meetings', id) : [];
   const sub = id === 'mine' ? 'Only you can see these: calls you recorded and your private folders.' : id === 'team' ? 'Shared with the whole team.' : id === 'clients' ? 'Calls recorded by people at your clients with Cue for clients. Each client only sees their own.' : 'A shared space for its own folders.';
+  if (!fresh()) return;
   $view.replaceChildren(
     h('div', { class: 'folder-head' },
       h('span', { class: 'big-icon' }, id === 'mine' ? h('span', { class: 'lock-ico big', html: ICON.lock }) : id === 'team' ? h('img', { src: 'assets/logo.svg', style: 'width:30px;height:30px;border-radius:8px' }) : (cueIcon(id === 'clients' ? 'handshake' : sp.icon, 30) || h('span', { class: 'space-letter big' }, sp.name[0].toUpperCase()))),

@@ -486,9 +486,7 @@ html, body { background: var(--bg); }
 /* live dot pulses */
 .live-dot { box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 50%, transparent); animation: live-pulse 2s infinite; }
 @keyframes live-pulse { 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
-/* pages rise in as you move between them (like the Master Inbox) */
-#view.enter > * { animation: fade-up 0.2s ease both; }
-@keyframes fade-up { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+/* Pages rise in as you move between them (like the Master Inbox): app.js plays it once the new page's content is there (see pageEnter). */
 .cu-row.now { background: var(--green-bg); }
 .share-box, .beats, .ask-a, .nudge-bar { background: var(--card); }
 
