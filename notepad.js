@@ -113,15 +113,113 @@ function transcriptText(c, names = { me: 'You', them: 'Them' }) {
   return (c.transcript || []).map((s) => `${typeof s.at === 'number' ? `[${fmtClock(s.at)}] ` : ''}${s.speaker === 'me' ? names.me : s.speaker === 'them' ? names.them : s.speaker}: ${s.text}`).join('\n');
 }
 
-// Copy as rich text (pastes formatted into Gmail, Docs, Slack) with the markdown as plain text.
+// The plain-text half of every copy, for wherever plain text is all that lands: WhatsApp,
+// iMessage, SMS, a .txt file, a terminal. No markup characters (no **, *, #, _), because
+// those only mean something in some apps and are clutter everywhere else. The shape is
+// kept instead: "•" bullets, "◦" for nested ones (indented), numbered lists, headings on
+// their own line, a blank line between blocks. Apps that take formatting (Slack, Gmail,
+// Docs, Notion, Word) get the HTML half, with real bold and lists.
+function plainText(root) {
+  const inline = (node) => [...node.childNodes].map((n) => {
+    if (n.nodeType === 3) return n.nodeValue.replace(/\s+/g, ' ');
+    if (n.nodeType !== 1) return '';
+    const t = n.tagName;
+    if (t === 'UL' || t === 'OL') return '';
+    if (t === 'BR') return '\n';
+    if (t === 'INPUT') return n.getAttribute('type') === 'checkbox' ? (n.hasAttribute('checked') || n.checked ? '☑ ' : '☐ ') : '';
+    const inner = inline(n);
+    if (t === 'A') { const href = n.getAttribute('href') || ''; const s2 = inner.trim(); return /^https?:\/\//.test(href) && s2 && s2 !== href ? `${inner} (${href})` : inner; }
+    return inner;
+  }).join('');
+  const line = (el) => inline(el).replace(/[ \t]*\n[ \t]*/g, '\n').replace(/ {2,}/g, ' ').trim();
+  const blocks = [];
+  const list = (el, depth, out) => {
+    let i = Number(el.getAttribute('start')) || 1;
+    for (const li of el.children) {
+      if (li.tagName !== 'LI') continue;
+      const mark = el.tagName === 'OL' ? `${i++}.` : depth ? '◦' : '•';
+      const text = line(li);
+      if (text) out.push(`${'    '.repeat(depth)}${mark} ${text.replace(/\n/g, `\n${'    '.repeat(depth)}  `)}`);
+      for (const sub of li.children) if (sub.tagName === 'UL' || sub.tagName === 'OL') list(sub, depth + 1, out);
+    }
+  };
+  let run = null;   // loose inline content (a selection can start in the middle of a paragraph)
+  const flush = () => { if (run) { const t = line(run); if (t) blocks.push(t); run = null; } };
+  const walk = (parent) => {
+    for (const el of [...parent.childNodes]) {
+      const t = el.nodeType === 1 ? el.tagName : '';
+      if (!t || !/^(P|DIV|SECTION|ARTICLE|H[1-6]|UL|OL|LI|BLOCKQUOTE|PRE|TABLE|THEAD|TBODY|TR|HR)$/.test(t)) {
+        if (!run) run = document.createElement('span');
+        run.append(el.cloneNode(true));
+        continue;
+      }
+      flush();
+      if (/^H[1-6]$/.test(t)) { const h2 = el.textContent.replace(/\s+/g, ' ').trim(); if (h2) blocks.push(h2); }
+      else if (t === 'UL' || t === 'OL') { const out = []; list(el, 0, out); if (out.length) blocks.push(out.join('\n')); }
+      else if (t === 'LI') { const holder = document.createElement('ul'); holder.append(el.cloneNode(true)); const out = []; list(holder, 0, out); if (out.length) blocks.push(out.join('\n')); }
+      else if (t === 'BLOCKQUOTE') { const q = plainText(el); if (q) blocks.push(q.split('\n').map((l) => (l ? `> ${l}` : '>')).join('\n')); }
+      else if (t === 'PRE') blocks.push(el.textContent.replace(/\n$/, ''));
+      else if (t === 'TABLE' || t === 'THEAD' || t === 'TBODY' || t === 'TR') {
+        const rows = (t === 'TR' ? [el] : [...el.querySelectorAll('tr')]).map((tr) => [...tr.children].map((td) => line(td)).join(' | ')).filter(Boolean);
+        if (rows.length) blocks.push(rows.join('\n'));
+      } else if (t === 'HR') blocks.push('———');
+      else if (t === 'P') { const p2 = line(el); if (p2) blocks.push(p2); }
+      else walk(el);   // DIV, SECTION…: look inside
+    }
+    flush();
+  };
+  walk(root);
+  return blocks.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+const mdToPlain = (md) => { const d = document.createElement('div'); d.innerHTML = renderMd(md); return plainText(d); };
+
+// Copy as rich text (pastes formatted into Slack, Gmail, Docs, Notion) with clean plain text
+// (bullets, no markup) for WhatsApp, texts and .txt files.
 async function copyRich(md) {
+  const plain = mdToPlain(md);
   try {
-    await navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([renderMd(md)], { type: 'text/html' }), 'text/plain': new Blob([md], { type: 'text/plain' }) })]);
+    await navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([renderMd(md)], { type: 'text/html' }), 'text/plain': new Blob([plain], { type: 'text/plain' }) })]);
     return true;
   } catch {
-    try { await navigator.clipboard.writeText(md); return true; } catch { return false; }
+    try { await navigator.clipboard.writeText(plain); return true; } catch { return false; }
   }
 }
+
+// Copying a selection anywhere in Cue (an Ask answer, the notes, a brief): the same clean plain
+// text, tidy HTML for apps that take formatting, and the markdown under a Cue-only type so
+// pasting back into the notes keeps bullets and bold. Form fields copy as usual.
+const CUE_MD_TYPE = 'text/x-cue-markdown';
+document.addEventListener('copy', (e) => {
+  const sel = window.getSelection();
+  const active = document.activeElement;
+  if (!e.clipboardData || !sel || sel.isCollapsed || !sel.rangeCount || (active && /^(INPUT|TEXTAREA)$/.test(active.tagName))) return;
+  const box = document.createElement('div');
+  for (let i = 0; i < sel.rangeCount; i++) {
+    const r = sel.getRangeAt(i);
+    const frag = r.cloneContents();
+    const ca = r.commonAncestorContainer;
+    // A selection inside one list loses the list around its items: put it back.
+    if (ca.nodeType === 1 && /^(UL|OL)$/.test(ca.tagName)) { const l = document.createElement(ca.tagName); l.append(frag); box.append(l); } else box.append(frag);
+  }
+  box.querySelectorAll('*').forEach((el) => {
+    for (const a of [...el.attributes]) if (!((el.tagName === 'A' && a.name === 'href') || (el.tagName === 'INPUT' && (a.name === 'type' || a.name === 'checked')) || (el.tagName === 'OL' && a.name === 'start'))) el.removeAttribute(a.name);
+  });
+  box.querySelectorAll('button, svg, .np-tabs, .ask-foot, .askp-foot').forEach((el) => el.remove());
+  const text = plainText(box);
+  if (!text.trim()) return;
+  e.preventDefault();
+  e.clipboardData.setData('text/plain', text);
+  e.clipboardData.setData('text/html', box.innerHTML);
+  // For the markdown, loose text at the top (a selection that starts mid-paragraph) goes in a paragraph.
+  const forMd = document.createElement('div');
+  let para = null;
+  for (const n of [...box.childNodes]) {
+    if (n.nodeType === 1 && /^(P|DIV|H[1-6]|UL|OL|BLOCKQUOTE|PRE|TABLE|HR)$/.test(n.tagName)) { para = null; forMd.append(n.cloneNode(true)); continue; }
+    if (!para) { para = document.createElement('p'); forMd.append(para); }
+    para.append(n.cloneNode(true));
+  }
+  try { e.clipboardData.setData(CUE_MD_TYPE, htmlToMd(forMd)); } catch {}
+});
 
 // Download a text file (the notes as .md) on the desktop and in the browser.
 function downloadText(name, text) {
@@ -256,7 +354,17 @@ function notepad(c, { onSaved, extra = null, transcript = null, names } = {}) {
         }
         saveDoc(editor, part);
       });
-      editor.addEventListener('paste', (e) => { e.preventDefault(); document.execCommand('insertText', false, e.clipboardData.getData('text/plain')); });
+      editor.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const md = e.clipboardData.getData(CUE_MD_TYPE);
+        if (md && md.trim()) {
+          // From Cue, through the same sanitizer as the notes. One paragraph goes in inline, at the caret.
+          const html = renderMd(md).trim();
+          const one = /^<p>[\s\S]*<\/p>$/.test(html) && html.indexOf('<p>', 1) < 0 ? html.slice(3, -4) : html;
+          document.execCommand('insertHTML', false, one);
+        }
+        else document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
+      });
       editor.addEventListener('keydown', (e) => {
         if (!(e.metaKey || e.ctrlKey)) return;
         const k = e.key.toLowerCase();
