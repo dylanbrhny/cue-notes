@@ -223,9 +223,13 @@ function notepad(c, { onSaved, extra = null, transcript = null, names } = {}) {
   function draw() {
     const tab = (v, label) => h('button', { class: view === v ? 'on' : '', onclick: () => { flush(); view = v; draw(); } }, label);
     const parts = notesParts(c);
+    // Open on a tab with something in it: notes that are only coaching (e.g. the checklist
+    // written when the AI couldn't run) open on Coaching, and the empty Notes tab is left out.
+    const showNotes = !!c.aiNotes && (!!parts.notes || !parts.coaching);
     if (view === 'coaching' && !parts.coaching) view = 'notes';
+    if (view === 'notes' && !showNotes && parts.coaching) view = 'coaching';
     const tabs = h('div', { class: 'np-tabs' },
-      c.aiNotes ? tab('notes', 'Notes') : null,
+      showNotes ? tab('notes', 'Notes') : null,
       c.aiNotes && parts.coaching ? tab('coaching', 'Coaching') : null,
       tab('mine', c.aiNotes ? 'My notes' : 'Notes'),
       transcript && (c.transcript || []).length ? tab('transcript', 'Transcript') : null,
