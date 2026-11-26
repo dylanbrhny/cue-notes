@@ -235,7 +235,7 @@ function askSend(thread, q, { callId = null, folderId = null } = {}) {
   return pending;
 }
 
-const askCopyBtn = (text) => h('button', { class: 'link-btn', onclick: async (e) => { await navigator.clipboard.writeText(text).catch(() => {}); e.target.textContent = 'Copied'; setTimeout(() => { e.target.textContent = 'Copy'; }, 1200); } }, 'Copy');
+const askCopyBtn = (text) => h('button', { class: 'link-btn', onclick: async (e) => { e.target.textContent = (await copyText(text)) ? 'Copied' : 'Copy failed'; setTimeout(() => { e.target.textContent = 'Copy'; }, 1200); } }, 'Copy');
 // "From: call, call": the calls the answer came from, each one a link to the call.
 const askUsed = (used, cls) => ((used || []).length ? h('span', { class: cls }, 'From: ', ...used.slice(0, 4).map((u, i) => [i ? ', ' : '', h('a', { href: '#', onclick: (e) => { e.preventDefault(); go({ view: 'call', id: u.id }); } }, u.title)])) : h('span'));
 // Redraws at most once a frame while text streams in.

@@ -73,12 +73,40 @@ function noteBlocks(root) {
 }
 const ownText = (el) => [...el.childNodes].filter((n) => !(n.nodeType === 1 && /^(UL|OL)$/.test(n.tagName))).map((n) => n.textContent).join('');
 
+// The coaching written for the rep (Checklist review, Dream outcome, Conversation dynamics)
+// gets its own tab, so the notes can be edited, copied and shared without it, and it stays put.
+// The split goes by heading name on purpose: the Coaching tab is exactly what a share link
+// leaves out, so a section typed under one of these headings moves there (and stays private).
+// Saving puts the coaching after the notes; nothing is dropped.
+// Both still live in one stored document (aiNotes), so Ask, MCP and the share page see what
+// they always did. KEEP IN STEP with public.shareable_notes in supabase/029_overnight_fixes.sql:
+// a section starts at a #-#### heading whose text begins with one of these names (any case) and
+// runs to the next #-#### heading.
+const COACH_HEAD = /^#{1,4}[ \t]*(checklist review|dream outcome|conversation dynamics)/i;
+const ANY_HEAD = /^#{1,4}[ \t]/;
+function splitCoaching(md) {
+  const notes = [];
+  const coaching = [];
+  let inCoach = false;
+  for (const line of String(md || '').split('\n')) {
+    if (COACH_HEAD.test(line)) inCoach = true;
+    else if (ANY_HEAD.test(line)) inCoach = false;
+    (inCoach ? coaching : notes).push(line);
+  }
+  const tidy = (a) => a.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  return { notes: tidy(notes), coaching: tidy(coaching) };
+}
+const joinNotes = (notes, coaching) => [notes, coaching].map((x) => String(x || '').trim()).filter(Boolean).join('\n\n');
+// Notes-mode calls (the plain note taker) have no coaching: never split those.
+const notesParts = (c) => (c.mode === 'notes' ? { notes: String(c.aiNotes || '').trim(), coaching: '' } : splitCoaching(c.aiNotes));
+
 // The notes as text you can paste anywhere: title, date and the notes.
-function noteMarkdown(c) {
+function noteMarkdown(c, body) {
   const when = c.startedAt ? new Date(c.startedAt).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
   const who = (c.attendees || []).map((a) => a.name || a.email).filter(Boolean);
   const head = [`# ${c.title || 'Untitled call'}`, [when, who.length ? `With ${who.join(', ')}` : ''].filter(Boolean).join(' · ')].filter(Boolean).join('\n');
-  return `${head}\n\n${String(c.aiNotes || c.myNotes || '').trim()}\n`;
+  // body: the text of one tab (Notes, Coaching, My notes). Without it: the whole notes.
+  return `${head}\n\n${String(body !== undefined ? body : (c.aiNotes || c.myNotes || '')).trim()}\n`;
 }
 
 function transcriptText(c, names = { me: 'You', them: 'Them' }) {
@@ -140,8 +168,12 @@ function notepad(c, { onSaved, extra = null, transcript = null, names } = {}) {
 
   const saveMine = debounce((v) => call('calls:update', { id: c.id, patch: { myNotes: v } }).then(showSaved), 400);
   let lastMd = c.aiNotes || '';
-  const saveDoc = debounce((editor) => {
-    const md = htmlToMd(editor);
+  // part: 'notes' or 'coaching', fixed when the editor is made. The other part is kept as it is,
+  // so typing in one tab can never drop the other (they're stored as one document).
+  const saveDoc = debounce((editor, part) => {
+    const edited = htmlToMd(editor);
+    const cur = notesParts(c);
+    const md = part === 'coaching' ? joinNotes(cur.notes, edited) : joinNotes(edited, cur.coaching);
     if (md === lastMd) return;
     lastMd = md;
     c.aiNotes = md; // so switching tabs and coming back shows what you wrote
@@ -161,10 +193,12 @@ function notepad(c, { onSaved, extra = null, transcript = null, names } = {}) {
     }
   }
 
-  const copyBtn = () => h('button', { class: 'np-copy', title: view === 'transcript' ? 'Copy the transcript' : 'Copy the notes (pastes formatted into email, Docs or Slack)', onclick: async (e) => {
+  const copyBtn = () => h('button', { class: 'np-copy', title: view === 'transcript' ? 'Copy the transcript' : view === 'coaching' ? 'Copy the coaching' : 'Copy the notes (pastes formatted into email, Docs or Slack)', onclick: async (e) => {
     flush();
     const b = e.currentTarget;
-    const ok = view === 'transcript' ? await navigator.clipboard.writeText(transcriptText(c, names)).then(() => true, () => false) : await copyRich(noteMarkdown(view === 'mine' ? { ...c, aiNotes: '' } : c));
+    const parts = notesParts(c);
+    const ok = view === 'transcript' ? await navigator.clipboard.writeText(transcriptText(c, names)).then(() => true, () => false)
+      : await copyRich(noteMarkdown(c, view === 'mine' ? (c.myNotes || '') : view === 'coaching' ? parts.coaching : parts.notes));
     b.textContent = ok ? 'Copied' : 'Copy failed';
     setTimeout(() => { b.textContent = 'Copy'; }, 1400);
   } }, 'Copy');
@@ -188,17 +222,22 @@ function notepad(c, { onSaved, extra = null, transcript = null, names } = {}) {
 
   function draw() {
     const tab = (v, label) => h('button', { class: view === v ? 'on' : '', onclick: () => { flush(); view = v; draw(); } }, label);
+    const parts = notesParts(c);
+    if (view === 'coaching' && !parts.coaching) view = 'notes';
     const tabs = h('div', { class: 'np-tabs' },
       c.aiNotes ? tab('notes', 'Notes') : null,
+      c.aiNotes && parts.coaching ? tab('coaching', 'Coaching') : null,
       tab('mine', c.aiNotes ? 'My notes' : 'Notes'),
       transcript && (c.transcript || []).length ? tab('transcript', 'Transcript') : null,
+      view === 'coaching' ? h('span', { class: 'np-hint', title: 'Checklist review, Dream outcome and Conversation dynamics stay inside Cue' }, 'For the rep. Share links leave this out.') : null,
       h('span', { class: 'np-key' }, status),
       (view === 'transcript' || c.aiNotes || c.myNotes) ? copyBtn() : null,
       extra);
 
     if (view === 'transcript' && transcript) { wrap.replaceChildren(tabs, drawTranscript()); return; }
-    if (view === 'notes' && c.aiNotes) {
-      const editor = h('div', { class: 'notepad md', contenteditable: viewAs ? 'false' : 'true', spellcheck: 'true', html: renderMd(c.aiNotes) });
+    if ((view === 'notes' || view === 'coaching') && c.aiNotes) {
+      const part = view;
+      const editor = h('div', { class: `notepad md${part === 'coaching' ? ' np-coaching' : ''}`, contenteditable: viewAs ? 'false' : 'true', spellcheck: 'true', html: renderMd(part === 'coaching' ? parts.coaching : parts.notes) });
       paint(editor);
       editor.addEventListener('input', (e) => {
         // After this input is done (a list can't be made in the middle of another edit).
@@ -211,7 +250,7 @@ function notepad(c, { onSaved, extra = null, transcript = null, names } = {}) {
           mine.add(normLine(ownText(block)));
           if (!/^H/.test(block.tagName)) block.classList.add('mine');
         }
-        saveDoc(editor);
+        saveDoc(editor, part);
       });
       editor.addEventListener('paste', (e) => { e.preventDefault(); document.execCommand('insertText', false, e.clipboardData.getData('text/plain')); });
       editor.addEventListener('keydown', (e) => {

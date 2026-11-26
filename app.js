@@ -92,6 +92,9 @@ function h(tag, attrs = {}, ...kids) {
 // d.flush() runs a pending call now (before the page changes).
 // Anything typed while viewing Cue as someone else (View as) is dropped, even if the
 // timer fires after the preview ends: the preview never saves.
+// Copy text; true when it reached the clipboard (so buttons never say "Copied" when it failed).
+function copyText(text) { return navigator.clipboard.writeText(String(text)).then(() => true, () => false); }
+
 function debounce(fn, ms) {
   let t;
   let args = null;

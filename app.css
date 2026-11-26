@@ -379,6 +379,7 @@ details.transcript[open] summary::before { content: '▾ '; }
 .np-key { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-3); }
 .np-key i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-left: 6px; }
 .np-key .k-mine { background: var(--text); } .np-key .k-ai { background: var(--text-3); }
+.np-hint { font-size: 11.5px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .notepad { outline: none; min-height: 160px; border-radius: 8px; padding: 2px 0; }
 .notepad li, .notepad p { color: var(--text-3); transition: color 0.15s; }
 .notepad li.mine, .notepad p.mine { color: var(--text); }

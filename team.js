@@ -397,7 +397,7 @@ async function keysPanel(s, keyInput, save, out) {
     field('Anthropic API key', teamKey('anthropicKey', 'sk-ant-…'), 'Live cues, objection detection, notes and the preset generator.'),
     field('Model', h('select', { onchange: async (e) => { const r = await call('keys:saveTeam', { model: e.target.value }); status.textContent = r.ok ? 'Saved for the whole team' : r.error; } },
       Object.entries(info.models || {}).map(([id, m]) => h('option', { value: id, selected: id === k.model }, m.label))),
-      'Opus judges best. Haiku is faster and far cheaper; try it if cues feel slow.'),
+      'Opus judges best. Sonnet is faster at half the price. Haiku is fastest and far cheaper; try it if cues feel slow.'),
     testRow);
 }
 
@@ -534,7 +534,7 @@ async function clientsPanel() {
     out.replaceChildren(h('div', { class: 'invite-box' },
       h('b', {}, `Invite for ${r.email}`), h('pre', {}, text),
       h('div', { class: 'row', style: 'gap:8px' },
-        h('button', { class: 'btn primary', onclick: (e) => { navigator.clipboard.writeText(text); e.target.textContent = 'Copied'; } }, 'Copy message'),
+        h('button', { class: 'btn primary', onclick: async (e) => { e.target.textContent = (await copyText(text)) ? 'Copied' : 'Copy failed'; } }, 'Copy message'),
         h('a', { class: 'btn', href: `mailto:${encodeURIComponent(r.email)}?subject=${encodeURIComponent('Your Cue invite')}&body=${encodeURIComponent(text)}` }, 'Email it'),
         h('span', { class: 'grow', style: 'font-size:12px;color:var(--text-3)' }, 'The code is shown only now. “New code” makes another.'))));
   };
@@ -572,7 +572,7 @@ async function guidePanel() {
       h('button', { class: 'btn primary', onclick: async () => { if (!input.value.trim()) return; const r = await call('guide:code', input.value.trim()); out.textContent = r.ok ? `Saved. Clients use: ${input.value.trim()}` : r.error; if (r.ok) input.value = ''; } }, 'Save code'),
       st.set ? h('button', { class: 'link-btn danger', onclick: async () => { if (!confirm('Turn off client access to the install guide?')) return; const r = await call('guide:code', ''); out.textContent = r.ok ? 'Client access turned off.' : r.error; } }, 'Turn off') : null),
     h('div', { class: 'row', style: 'gap:8px' }, h('span', { class: 'grow', style: 'font-size:12.5px;color:var(--text-3)' }, st.set ? 'Client access is on.' : 'No client code yet: only the team can open it.'),
-      h('button', { class: 'link-btn', onclick: () => { navigator.clipboard.writeText('https://cue.synapsemfg.com/download'); out.textContent = 'Link copied.'; } }, 'Copy link')),
+      h('button', { class: 'link-btn', onclick: async () => { out.textContent = (await copyText('https://cue.synapsemfg.com/download')) ? 'Link copied.' : 'Copy failed. The link is https://cue.synapsemfg.com/download'; } }, 'Copy link')),
     out);
 }
 
@@ -1069,7 +1069,7 @@ async function copyShareLink(id) {
     if (!r.ok) { alert(r.error); return null; }
     share = r;
   }
-  await navigator.clipboard.writeText(share.url).catch(() => {});
+  share.copied = await copyText(share.url);
   return share;
 }
 
@@ -1129,7 +1129,7 @@ function callContextMenu(e, c) {
   const many = ids.length > 1 ? ` ${ids.length} calls` : '';
   contextMenu(e, [
     many ? null : ['Open', () => go(c.status === 'live' && c.mine === false ? { view: 'monitor', id: c.id } : { view: 'call', id: c.id })],
-    done && !many ? ['Copy share link', async () => { if (await copyShareLink(c.id)) flash('Share link copied'); }] : null,
+    done && !many ? ['Copy share link', async () => { const s = await copyShareLink(c.id); if (s) flash(s.copied ? 'Share link copied' : 'Link made, but copying failed. Use Share to see it.'); }] : null,
     done ? (c.archivedAt ? [`Unarchive${many}`, () => archiveCalls(ids, false)] : [`Archive${many}`, () => archiveCalls(ids, true)]) : null,
     done ? [`Delete${many}`, () => trashCalls(ids), true] : null,
   ]);
@@ -1142,7 +1142,7 @@ function rowActions(c) {
     onmousedown: (e) => e.stopPropagation(),
     onclick: (e) => { e.stopPropagation(); e.preventDefault(); fn(e); } });
   return h('span', { class: 'row-actions' },
-    btn('Copy share link', 'link', async (e) => { const b = e.currentTarget; b.classList.add('busy'); const ok = await copyShareLink(c.id); b.classList.remove('busy'); if (ok) flash('Share link copied'); }),
+    btn('Copy share link', 'link', async (e) => { const b = e.currentTarget; b.classList.add('busy'); const s = await copyShareLink(c.id); b.classList.remove('busy'); if (s) flash(s.copied ? 'Share link copied' : 'Link made, but copying failed. Use Share to see it.'); }),
     c.archivedAt ? btn('Unarchive', 'unarchive', () => archiveCalls(actionIds(c.id), false)) : btn('Archive', 'archive', () => archiveCalls(actionIds(c.id), true)),
     btn('Delete', 'trash', () => trashCalls(actionIds(c.id))));
 }
@@ -1160,9 +1160,9 @@ function shareButton(c) {
     if (!share) return;
     fill(share);
     box.hidden = false;
-    flash('Share link copied');
+    flash(share.copied ? 'Share link copied' : 'Copying failed. The link is below.');
   } }, h('span', { html: ICON.link || '', style: 'display:inline-grid;width:12px;height:12px;vertical-align:-1px;margin-right:5px' }), label);
-  const copy = async (url, el) => { await navigator.clipboard.writeText(url).catch(() => {}); el.textContent = 'Copied'; setTimeout(() => { el.textContent = 'Copy link'; }, 1500); };
+  const copy = async (url, el) => { el.textContent = (await copyText(url)) ? 'Copied' : 'Copy failed'; setTimeout(() => { el.textContent = 'Copy link'; }, 1500); };
   function fill(share) {
     box.replaceChildren(
       h('input', { class: 'input share-url', readonly: true, value: share.url, onclick: (e) => e.target.select() }),
