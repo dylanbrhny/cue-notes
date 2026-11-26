@@ -959,7 +959,13 @@ window.cue.on('calls:changed', async (p) => {
   if (c && route.view === 'call' && route.id === id && c.status !== $view.dataset.status) renderCall(id);
 });
 window.cue.on('team:changed', () => { renderList(); renderTeamLive(); });
-window.cue.on('auth:changed', async () => { if (typeof tabMemo !== 'undefined') tabMemo.clear(); authState = await rawCall('auth:state'); viewAsCheckAccount(); loadTeamEmails(); renderAccount(); renderNav(); renderTeamLive(); renderFolders(); presetsChanged(); renderView(); });
+window.cue.on('auth:changed', async () => {
+  if (typeof tabMemo !== 'undefined') tabMemo.clear();
+  const was = authState.user?.id || null;
+  authState = await rawCall('auth:state');
+  // Someone else signed in, or nobody is: drop the Ask chats (they can quote the last person's calls).
+  if ((authState.user?.id || null) !== was && typeof askReset === 'function') askReset();
+  viewAsCheckAccount(); loadTeamEmails(); renderAccount(); renderNav(); renderTeamLive(); renderFolders(); presetsChanged(); renderView(); });
 window.cue.on('computers:changed', () => { if (route.view === 'settings' || route.view === 'admin') renderView(); });
 window.cue.on('monitor:event', (e) => onMonitorEvent(e));
 window.cue.on('settings:changed', (s) => { applyTheme(s.theme); if (route.view === 'settings') renderSettings(); });
@@ -1012,6 +1018,7 @@ function applyTheme(t) { document.documentElement.dataset.theme = ['light', 'dar
 window.addEventListener('DOMContentLoaded', async () => {
   call('settings:get').then((s) => applyTheme(s.theme));
   info = await call('app:info');
+  document.body.classList.toggle('win', info.platform === 'win32'); // Windows: its window buttons sit over the top-right corner
   authState = await call('auth:state');
   loadTeamEmails();
   renderAccount();
