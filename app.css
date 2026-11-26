@@ -1099,8 +1099,76 @@ body.win .askp-top { padding-top: 44px; }
 /* there for screen readers only: the conversation's heading and the "answer landed" status */
 .askp-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-/* a conversation on a narrow page keeps just New chat, so the quick starts don't wrap onto a second row */
-@container (max-width: 770px) { .askp.chat .askp-chip.starter { display: none; } }
+/* All chats: the clock at the end of the row (lit while the list is showing) */
+.askp-hist { width: 32px; padding: 0; justify-content: center; margin-left: 4px; color: var(--text-2); }
+.askp-hist svg { width: 16px; height: 16px; }
+.askp-hist.on { background: var(--active); color: var(--text); box-shadow: none; }
+
+/* a conversation or All chats on a narrow page keeps just New chat and the clock, so the quick starts don't wrap onto a second row */
+@container (max-width: 800px) { .askp:is(.chat, .all) .askp-chip.starter { display: none; } }
+
+/* the steps while Cue works (the latest one turning), then the answer as it is written */
+.askp-live { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; line-height: 18px; color: var(--text-3); }
+.askp-live > div { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.askp-live > div.now { color: var(--text-2); }
+.askp-live .spin { width: 10px; height: 10px; border-width: 1.5px; flex: none; margin: 0 1px; }
+.askp-done { display: grid; place-items: center; width: 12px; height: 12px; flex: none; color: var(--text-3); }
+.askp-done svg { width: 11px; height: 11px; }
+.askp-live + .askp-md { margin-top: 4px; }
+.askp-stopped { margin-left: auto; color: var(--text-3); }
+.askp-stopped + .link-btn { margin-left: 0; }
+/* while an answer is written, the arrow is a Stop square */
+.askp-send.stop { background: var(--text); color: var(--bg); box-shadow: none; }
+.askp-send.stop:hover { background: color-mix(in srgb, var(--text) 82%, var(--bg)); }
+.askp-send.stop svg { width: 16px; height: 16px; margin: 0; }
+:root[data-theme="synapse"] .askp-send.stop { color: var(--bg); }
+
+/* Recent chats under the box, and the All chats list: one line per chat, title and day */
+.askp-orb.sm { width: 8px; height: 8px; box-shadow: 0 0 6px rgba(47, 124, 246, 0.5); }
+.askp-recent { margin-top: 30px; }
+.askp-recent-head { display: flex; justify-content: space-between; align-items: baseline; padding: 0 4px 8px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--text-3); }
+.askp-link {
+  -webkit-app-region: no-drag; border: 0; padding: 0; background: none; font-family: var(--font); font-size: 13px; letter-spacing: inherit; color: var(--text); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, var(--text) 35%, transparent);
+}
+.askp-link:hover { text-decoration-color: currentColor; }
+.askp-row {
+  box-sizing: border-box; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; margin: 0; padding: 0 4px;
+  border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; text-align: left; cursor: pointer;
+  font-family: var(--font); font-size: 14px; letter-spacing: inherit; color: var(--text-2);
+}
+.askp-row:hover { color: var(--text); background: color-mix(in srgb, var(--text) 2.5%, transparent); }
+.askp-row:focus-visible { outline-offset: -2px; }
+.askp-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.askp-row-date { flex: none; font-size: 12.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.askp-ib { display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--text-3); cursor: pointer; }
+.askp-ib svg { width: 15px; height: 15px; }
+.askp-row-del { opacity: 0.55; }
+.askp-row:hover .askp-row-del, .askp-row:focus-within .askp-row-del { opacity: 1; }
+.askp-row-del:hover, .askp-row-del:focus-visible { background: var(--red-bg); color: var(--red); opacity: 1; }
+/* "Delete this chat?" in the row itself */
+.askp-row.confirm { cursor: default; gap: 8px; color: var(--text); background: color-mix(in srgb, var(--red) 6%, transparent); }
+.askp-row.confirm:hover { background: color-mix(in srgb, var(--red) 6%, transparent); }
+.askp-row.confirm .btn { height: 28px; padding: 0 11px; font-size: 13px; }
+.askp-row.confirm .btn.danger { background: var(--red); color: #fff; box-shadow: none; }
+.askp-row.confirm .btn.danger:hover { background: color-mix(in srgb, var(--red) 88%, #000); }
+/* the dark themes' red is light: dark text on it reads (white is under 4.5:1), and hover lightens */
+:root:is([data-theme="dark"], [data-theme="synapse"]) .askp-row.confirm .btn.danger { color: var(--bg); }
+:root:is([data-theme="dark"], [data-theme="synapse"]) .askp-row.confirm .btn.danger:hover { background: color-mix(in srgb, var(--red) 86%, #fff); }
+
+.askp-all { flex: 1; min-height: 0; width: 100%; max-width: 760px; margin: 0 auto; padding: 24px 24px 40px; overflow-y: auto; }
+.askp-all-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.askp-all-title { flex: 1; margin: 0; font-family: var(--font); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: -0.01em; color: var(--text); }
+.askp-search { width: 100%; max-width: 240px; }
+.askp-list { border-top: 1px solid var(--line); }
+.askp-empty { margin: 16px 4px; font-size: 13.5px; color: var(--text-3); }
+/* very narrow: the title gets the room, the day goes */
+@container (max-width: 420px) {
+  .askp-row-date { display: none; } .askp-row { gap: 8px; }
+  /* "Delete this chat?" on its own line, the buttons under it, rather than being cut off */
+  .askp-row.confirm { flex-wrap: wrap; row-gap: 6px; padding: 9px 4px 10px; }
+  .askp-row.confirm .askp-row-title { flex-basis: 100%; white-space: normal; line-height: 1.35; }
+}
 
 @media (max-width: 760px) {
   .askp-top { padding: 12px 14px 4px; gap: 6px; }
@@ -1108,5 +1176,9 @@ body.win .askp-top { padding-top: 44px; }
   .askp-hero { font-size: 30px; gap: 10px; }
   .askp-thread { padding: 16px; }
   .askp-dock { padding: 6px 16px 14px; }
+  .askp-all { padding: 16px 16px 32px; }
+  .askp-all-head { flex-wrap: wrap; }
+  .askp-search { max-width: none; }
 }
+@media (hover: none) { .askp-row-del { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .askp-orb.busy { animation: none; } }
