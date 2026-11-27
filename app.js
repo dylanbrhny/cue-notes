@@ -454,6 +454,7 @@ function checkRow(i, isLive) {
   return h('li', { class: `${i.done ? 'done' : ''} ${isLive ? 'live' : ''}`, onclick: isLive ? () => call('call:toggle', i.id) : null, title: isLive ? 'Click to tick by hand' : null },
     h('span', { class: 'box', html: i.done ? ICON.check : '' }),
     h('span', { class: 'grow' }, h('span', { class: 'label' }, i.label), i.done && i.evidence ? h('span', { class: 'ev' }, `“${i.evidence}”`) : null,
+      !i.done && i.revoked?.reason ? h('span', { class: 'ev revoked', title: i.revoked.evidence ? `Ticked during the call on: “${i.revoked.evidence}”` : null }, `Not counted: ${i.revoked.reason}`) : null,
       !i.done && i.say ? h('span', { class: 'say' }, `For them: ${i.say}`) : null),
     isLive && !i.done ? h('button', { class: 'link-btn skip-link', title: 'Not for this call (doesn’t count against you)', onclick: (e) => { e.stopPropagation(); call('call:skip', { id: i.id, skip: true }); } }, 'Not for this call') : null);
 }
