@@ -130,7 +130,7 @@ async function renderMonitor(id) {
   const first = (r.meeting.owner || 'Caller').split(' ')[0];
   mon = { id, meeting: r.meeting, snapshot: r.snapshot, names: { me: first, them: 'Them' } };
 
-  const input = h('input', { type: 'text', class: 'input nudge-input', maxlength: '200', placeholder: `Send ${first} a quiet nudge…` });
+  const input = h('input', { type: 'text', class: 'input nudge-input', maxlength: '200', placeholder: `Send ${first} a quiet nudge` });
   const status = h('span', { class: 'saved' });
   const sendNudge = async (text) => {
     text = String(text || '').trim();

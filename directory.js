@@ -323,7 +323,7 @@ async function renderCompanies() {
       const r = await call('companies:aiNames');
       if (!r.ok) alert(r.error);
       renderCompanies();
-    } }, h('span', { html: ICON.sparkle, style: 'display:inline-grid;width:13px;height:13px;vertical-align:-2px;margin-right:4px' }), 'Tidy names with AI');
+    } }, h('span', { html: ICON.pen, style: 'display:inline-grid;width:13px;height:13px;vertical-align:-2px;margin-right:4px' }), 'Tidy names with AI');
     $view.replaceChildren(tabBar('companies'),
       h('div', { class: 'row tab-tools' }, searchBox('Search companies', draw), h('span', { class: 'saved' }, `${all.length} companies`), tidy),
       h('table', { class: 'ent-table' }, h('thead', {}, h('tr', {}, h('th', {}, 'Company'), h('th', { class: 'num' }, 'People'), h('th', { class: 'num' }, 'Meetings'), h('th', {}, 'Last met'))), body));
@@ -406,7 +406,7 @@ function briefSection(kind, id, text, at) {
     if (!r.ok) { alert(r.error); return; }
     body.replaceChildren(h('div', { html: renderMd(r.text) }));
     stamp.textContent = 'updated just now';
-  } }, h('span', { html: ICON.sparkle, style: 'display:inline-grid;width:13px;height:13px;vertical-align:-2px;margin-right:4px' }), text ? 'Refresh' : 'Write brief');
+  } }, h('span', { html: ICON.pen, style: 'display:inline-grid;width:13px;height:13px;vertical-align:-2px;margin-right:4px' }), text ? 'Refresh' : 'Write brief');
   const stamp = h('span', { class: 'saved' }, at ? `updated ${ago(at)}` : '');
   return h('div', { class: 'section' }, h('div', { class: 'section-head' }, h('h2', {}, 'What we know'), stamp, btn), body);
 }

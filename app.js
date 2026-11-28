@@ -57,7 +57,7 @@ const ICON = {
   filesTab: lineIcon('M12 2 2 7l10 5 10-5-10-5z M2 17l10 5 10-5 M2 12l10 5 10-5'),
   folder: lineIcon('M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z'),
   live: lineIcon('M4.9 19.1a10 10 0 0 1 0-14.2 M7.8 16.2a6 6 0 0 1 0-8.4 M16.2 7.8a6 6 0 0 1 0 8.4 M19.1 4.9a10 10 0 0 1 0 14.2 M14 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0z'),
-  sparkle: lineIcon('M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z M19 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z'),
+  chat: lineIcon('M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'),
   archive: lineIcon('M21 8v13H3V8 M1 3h22v5H1z M10 12h4'),
   unarchive: lineIcon('M21 8v13H3V8 M1 3h22v5H1z M12 18v-6 M9.5 14.5 12 12l2.5 2.5'),
   trash: lineIcon('M3 6h18 M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6 M10 11v6 M14 11v6 M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2'),
@@ -183,7 +183,7 @@ function renderNav() {
   // Like the Master Inbox: where you work at the top, setup at the bottom of the sidebar.
   const $foot = document.getElementById('foot-nav');
   if (isClientUser()) { $nav.replaceChildren(item('home', 'Home', 'home')); $foot.replaceChildren(item('settings', 'Settings', 'settings')); return; }
-  $nav.replaceChildren(item('home', 'Home', 'home'), live, authState.user ? item('ask', 'Ask Cue', 'sparkle') : null, authState.user ? item('wins', 'What wins', 'trophy') : null);
+  $nav.replaceChildren(item('home', 'Home', 'home'), live, authState.user ? item('ask', 'Ask Cue', 'chat') : null, authState.user ? item('wins', 'What wins', 'trophy') : null);
   $foot.replaceChildren(item('presets', 'Presets', 'presets'), item('settings', 'Settings', 'settings'),
     viewer()?.role === 'admin' ? item('admin', 'Admin', 'shield') : null);
 }
@@ -669,7 +669,7 @@ async function renderPresetsInner() {
         ? `notes template · ${(x.sections || []).length} sections${settings.defaultPresetId === x.id ? ' · default' : ''}`
         : `${x.checklist.length} beat${x.checklist.length === 1 ? '' : 's'} · ${(x.objections || []).length} objection${(x.objections || []).length === 1 ? '' : 's'}${settings.defaultPresetId === x.id ? ' · default' : ''}`))),
     h('button', { class: `preset-tab ai-tab ${presetEditing === '__ai' ? 'on' : ''}`, onclick: () => { presetEditing = '__ai'; renderPresets(); } },
-      h('span', { html: ICON.sparkle, style: 'display:inline-grid;width:14px;height:14px;vertical-align:-2px;margin-right:6px' }), 'Generate with AI'),
+      h('span', { html: ICON.pen, style: 'display:inline-grid;width:14px;height:14px;vertical-align:-2px;margin-right:6px' }), 'Generate with AI'),
     h('button', { class: 'preset-tab', onclick: async () => {
       const np = { id: uniqueId('new-preset', presets), name: 'New preset', description: '', checklist: [], objections: [] };
       presets.push(np); presetEditing = np.id; await call('presets:save', presets); renderPresets();
@@ -735,7 +735,7 @@ async function renderPresetsInner() {
     presets[presets.indexOf(p)] = np;
     await call('presets:save', presets); presetsChanged(); renderPresets();
   } }, 'Improve with AI');
-  const improveRow = h('div', { class: 'improve' }, h('span', { html: ICON.sparkle, style: 'display:inline-grid;width:15px;height:15px;color:var(--green)' }), improveInput, improveBtn);
+  const improveRow = h('div', { class: 'improve' }, h('span', { html: ICON.pen, style: 'display:inline-grid;width:15px;height:15px;color:var(--green)' }), improveInput, improveBtn);
 
   const move = (arr, i, d) => { const j = i + d; if (j < 0 || j >= arr.length) return; [arr[i], arr[j]] = [arr[j], arr[i]]; touch(); renderPresets(); };
 
@@ -894,16 +894,17 @@ async function renderSettings() {
       h('span', { class: 'grow' }, h('b', {}, 'Team settings are on the Admin page'), ' · coaching, playbook, presets, devices, calendars, share links, keys and the simulator'),
       h('span', {}, 'Open →')) : null,
     h('div', { class: 'panel', 'data-open': '' }, h('h3', {}, 'Appearance'),
-      // The same three themes as the Master Inbox.
+      // Like Slack: a mode (Light, Dark or the computer's) and a colour on top. Same list as the Master Inbox.
       h('div', { class: 'theme-pick' }, [
-        ['light', 'Light', '#f9f9f8', '#ffffff', ['#37352f', '#2383e2']],
-        ['dark', 'Dark', '#202020', '#191919', ['#ededed', '#2383e2']],
-        ['synapse', 'Synapse', '#0b1120', '#070b16', ['#4a9eff', '#34d399']],
-      ].map(([id, label, side, page, [a, b]]) => h('button', { class: (s.theme || 'light') === id ? 'on' : '', onclick: async () => { applyTheme(id); await save({ theme: id }); renderSettings(); } },
-        h('span', { class: 'sw', style: `background:${page}` },
-          h('span', { class: 's1', style: `background:${side}` }, h('i', { style: `width:80%;background:${a};opacity:.55` }), h('i', { style: `width:60%;background:${a};opacity:.3` }), h('i', { style: `width:70%;background:${a};opacity:.3` })),
-          h('span', { class: 's2' }, h('i', { style: `width:70%;background:${a};opacity:.8` }), h('i', { style: `width:90%;background:${a};opacity:.25` }), h('i', { style: `width:40%;background:${b}` }))),
-        label)))),
+        ['light', 'Light', ['#f7f7f2', '#fcfcf8', '#292929']],
+        ['dark', 'Dark', ['#222220', '#1b1b19', '#edece6']],
+        ['system', 'Match my computer', null],
+      ].map(([id, label, sw]) => h('button', { class: themeMode(s.theme) === id ? 'on' : '', onclick: async () => { applyTheme(id, s.accent); await save({ theme: id }); renderSettings(); } },
+        sw ? swatch(...sw) : h('span', { class: 'sw split' }, swatch('#f7f7f2', '#fcfcf8', '#292929'), swatch('#222220', '#1b1b19', '#edece6')),
+        label))),
+      h('div', { class: 'accent-pick', role: 'radiogroup', 'aria-label': 'Colour' }, ACCENTS.map(([id, label, light, dark]) =>
+        h('button', { class: accentOf(s) === id ? 'on' : '', role: 'radio', 'aria-checked': String(accentOf(s) === id), title: label, onclick: async () => { applyTheme(s.theme, id); await save({ accent: id }); renderSettings(); } },
+          h('span', { class: 'dot', style: `background:${document.documentElement.dataset.theme === 'dark' ? dark : light}` }), label)))),
     ...team,
     viewer()?.role === 'admin' || isClientUser() ? null : await keysPanel(s, keyInput, save, out),
     WEB ? null : h('div', { class: 'panel' }, h('h3', {}, 'Audio'),
@@ -972,7 +973,7 @@ window.cue.on('auth:changed', async () => {
   viewAsCheckAccount(); loadTeamEmails(); renderAccount(); renderNav(); renderTeamLive(); renderFolders(); presetsChanged(); renderView(); });
 window.cue.on('computers:changed', () => { if (route.view === 'settings' || route.view === 'admin') renderView(); });
 window.cue.on('monitor:event', (e) => onMonitorEvent(e));
-window.cue.on('settings:changed', (s) => { applyTheme(s.theme); if (route.view === 'settings') renderSettings(); });
+window.cue.on('settings:changed', (s) => { applyTheme(s.theme, s.accent); if (route.view === 'settings') renderSettings(); });
 window.cue.on('live:notes', (n) => { const el = document.getElementById('live-ai-notes'); if (el && n?.text) el.replaceChildren(h('div', { html: renderMd(n.text) })); });
 window.cue.on('calendar:changed', () => { if (route.view === 'settings' || route.view === 'admin') renderView(); });
 let lastUpdateStatus = null;
@@ -1018,9 +1019,25 @@ document.addEventListener('keydown', (e) => {
 });
 
 // Start once every script on the page (app.js, team.js) has run.
-function applyTheme(t) { document.documentElement.dataset.theme = ['light', 'dark', 'synapse'].includes(t) ? t : 'light'; }
+// The look: a mode (light, dark, or the computer's) plus a colour. Same ids as the Master Inbox.
+const ACCENTS = [['olive', 'Olive', '#5b6f00', '#b2c248'], ['navy', 'Navy', '#3d4f8c', '#8ea2e0'], ['clay', 'Clay', '#a4502e', '#e0896a'],
+  ['slate', 'Slate', '#3f5566', '#9db3c4'], ['plum', 'Plum', '#7a3f75', '#c99ac4'], ['vision', 'Colour-blind friendly', '#0072b2', '#56b4e9']];
+const themeMode = (t) => (['light', 'dark', 'system'].includes(t) ? t : t === 'synapse' ? 'dark' : 'light'); // the old Synapse theme is Dark + Navy
+const accentOf = (s) => (ACCENTS.some(([id]) => id === s.accent) ? s.accent : s.theme === 'synapse' ? 'navy' : 'olive');
+const prefersDark = matchMedia('(prefers-color-scheme: dark)');
+let look = {};
+function applyTheme(theme, accent) {
+  if (theme !== undefined) look = { theme, accent };
+  const mode = themeMode(look.theme);
+  document.documentElement.dataset.theme = mode === 'system' ? (prefersDark.matches ? 'dark' : 'light') : mode;
+  document.documentElement.dataset.accent = accentOf(look);
+}
+prefersDark.addEventListener('change', () => applyTheme());
+const swatch = (side, page, ink) => h('span', { class: 'sw' },
+  h('span', { class: 's1', style: `background:${side}` }, h('i', { style: `width:80%;background:${ink};opacity:.55` }), h('i', { style: `width:60%;background:${ink};opacity:.3` }), h('i', { style: `width:70%;background:${ink};opacity:.3` })),
+  h('span', { class: 's2', style: `background:${page}` }, h('i', { style: `width:70%;background:${ink};opacity:.8` }), h('i', { style: `width:90%;background:${ink};opacity:.25` }), h('i', { style: 'width:40%;background:var(--accent)' })));
 window.addEventListener('DOMContentLoaded', async () => {
-  call('settings:get').then((s) => applyTheme(s.theme));
+  call('settings:get').then((s) => applyTheme(s.theme, s.accent));
   info = await call('app:info');
   document.body.classList.toggle('win', info.platform === 'win32'); // Windows: its window buttons sit over the top-right corner
   authState = await call('auth:state');

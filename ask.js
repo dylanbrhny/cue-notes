@@ -261,7 +261,7 @@ function askPanel({ callId = null, folderId = null, folderName = '', compact = f
   const thread = askThreads.get(scope);
   const box = h('div', { class: `ask ${compact ? 'compact' : ''}` });
   const log = h('div', { class: 'ask-log' });
-  const input = h('textarea', { class: 'ask-input', rows: 1, placeholder: callId ? 'Ask about this call…' : `Ask about the calls in ${folderName || 'this folder'}…`,
+  const input = h('textarea', { class: 'ask-input', rows: 1, placeholder: callId ? 'Ask about this call' : `Ask about the calls in ${folderName || 'this folder'}`,
     onfocus: () => box.classList.add('focused'), onblur: () => setTimeout(() => box.classList.remove('focused'), 150),
     onkeydown: (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(input.value); } },
     oninput: () => { input.style.height = 'auto'; input.style.height = `${Math.min(input.scrollHeight, 160)}px`; } });
@@ -339,14 +339,14 @@ function askPanel({ callId = null, folderId = null, folderName = '', compact = f
   // Esc or a click anywhere outside closes it; "Show chat" opens it again.
   const panel = h('div', { class: 'ask-panel', role: 'dialog', 'aria-label': 'Ask Cue' },
     h('div', { class: 'ask-head' },
-      h('span', { class: 'ask-title' }, h('span', { class: 'ask-ic', html: ICON.sparkle }), 'Ask Cue',
+      h('span', { class: 'ask-title' }, h('span', { class: 'ask-ic', html: ICON.chat }), 'Ask Cue',
         h('span', { class: 'ask-scope' }, callId ? 'about this call' : `about ${folderName || 'this folder'}`)),
       h('span', { class: 'grow' }),
       h('button', { class: 'link-btn', onclick: () => { newChat(); input.focus(); } }, 'New chat'),
       h('button', { class: 'icon-btn ask-close', title: 'Close (Esc)', 'aria-label': 'Close chat', html: ICON.x, onclick: () => setOpen(false) })),
     log);
   const reopen = h('div', { class: 'ask-reopen-row' },
-    h('button', { class: 'ask-reopen', onclick: () => setOpen(true) }, h('span', { class: 'ask-ic', html: ICON.sparkle }), 'Show chat'));
+    h('button', { class: 'ask-reopen', onclick: () => setOpen(true) }, h('span', { class: 'ask-ic', html: ICON.chat }), 'Show chat'));
   function layout() {
     const has = thread.length > 0, open = has && !askClosed.has(scope);
     panel.hidden = !open;
@@ -630,7 +630,7 @@ function askPage() {
     newBtn.hidden = mode === 'home';
     histBtn.classList.toggle('on', mode === 'all');
     histBtn.setAttribute('aria-pressed', String(mode === 'all'));
-    input.placeholder = mode === 'chat' ? 'Ask a follow-up…' : 'Ask anything about the team’s calls';
+    input.placeholder = mode === 'chat' ? 'Ask a follow-up' : 'Ask anything about the team’s calls';
     box.classList.toggle('big', mode === 'home');
     const typing = document.activeElement === input;
     if (mode === 'home') {

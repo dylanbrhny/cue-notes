@@ -334,7 +334,10 @@ function objection(o) {
 // ---------------------------------------------------------------------------
 
 window.cue.on('overlay:state', (next) => {
-  if (next.theme && document.documentElement.dataset.theme !== next.theme) document.documentElement.dataset.theme = next.theme;
+  if (next.theme) { // the card follows the app: Light, Dark, or the computer's mode
+    const t = next.theme === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : next.theme === 'synapse' ? 'dark' : next.theme;
+    if (document.documentElement.dataset.theme !== t) document.documentElement.dataset.theme = t;
+  }
   if (next.mode === 'live') {
     const s = next.snapshot;
     const done = new Set(s.items.filter((i) => i.done).map((i) => i.id));

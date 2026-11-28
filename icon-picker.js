@@ -78,7 +78,7 @@
     el.innerHTML = `
       <div class="ip-head"><span class="ip-tab on">Icons</span><span class="ip-grow"></span>${value ? '<button type="button" class="ip-remove">Remove</button>' : ''}</div>
       <div class="ip-tools">
-        <label class="ip-search">${UI.search}<input type="text" placeholder="Filter…" spellcheck="false" autocomplete="off"></label>
+        <label class="ip-search">${UI.search}<input type="text" placeholder="Filter" spellcheck="false" autocomplete="off"></label>
         <button type="button" class="ip-tool ip-shuffle" title="Random icon" aria-label="Random icon">${UI.shuffle}</button>
         <button type="button" class="ip-tool ip-color" title="Colour" aria-label="Colour"><i class="ip-dot"></i></button>
       </div>

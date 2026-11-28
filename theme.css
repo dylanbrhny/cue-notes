@@ -1,63 +1,70 @@
-/* Same look as the Master Inbox (inbox.synapsemfg.com): Notion's palette and
-   Inter, with three themes. Light is the default; Dark is Notion's dark;
+/* Three themes. Light (the default) follows Granola's look; Dark is the same look in charcoal;
    Synapse is the navy of synapsemfg.com. */
 @import url('fonts/fonts.css');
 
+/* Light is Granola's look (granola.ai): warm off-white, olive green accent, dark pill
+   buttons, serif page titles. Our own fonts: Inter for text, the system serif for titles. */
 :root, :root[data-theme="light"] {
-  --bg: #ffffff;
-  --bg-sunk: #f9f9f8;
-  --bg-hover: rgba(55, 53, 47, 0.045);
-  --active: rgba(55, 53, 47, 0.075);
+  --bg: #fcfcf8;
+  --bg-sunk: #f7f7f2;
+  --bg-hover: rgba(98, 90, 34, 0.06);
+  --active: rgba(86, 81, 46, 0.12);
   --card: #ffffff;
-  --text: #37352f;
-  --text-2: rgba(55, 53, 47, 0.68);
-  --text-3: rgba(55, 53, 47, 0.46);
-  --text-4: rgba(55, 53, 47, 0.28);
-  --line: rgba(55, 53, 47, 0.09);
-  --line-2: rgba(55, 53, 47, 0.16);
-  --accent: #2383e2;
-  --accent-bg: rgba(35, 131, 226, 0.08);
-  --accent-line: rgba(35, 131, 226, 0.35);
+  --text: #292929;
+  --text-2: #4e4d4b;
+  --text-3: #72726e;
+  --text-4: #acada8;
+  --line: rgba(71, 67, 42, 0.11);
+  --line-2: rgba(71, 67, 42, 0.2);
+  --accent: #5b6f00;
+  --accent-bg: rgba(120, 140, 21, 0.15);
+  --accent-line: rgba(178, 194, 72, 0.6);
   --accent-glow: transparent;
+  --accent-fg: #fcfcf8;
   --green: #448361;
   --green-bg: #edf3ec;
-  --amber: #cb912f;
-  --amber-bg: #fbf3db;
-  --amber-line: rgba(203, 145, 47, 0.35);
-  --red: #e03e3e;
-  --red-bg: #fdebec;
-  --focus: #2383e2;
+  --amber: #b07d1f;
+  --amber-bg: #faf3dc;
+  --amber-line: rgba(176, 125, 31, 0.35);
+  --red: #bd4a30;
+  --red-bg: #fbece7;
+  --focus: #788c15;
   --radius: 10px;
+  --btn-radius: 999px;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --font: 'Inter', ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   --font-display: var(--font);
-  --pop: 0 0 0 1px rgba(15, 15, 15, 0.05), 0 3px 6px rgba(15, 15, 15, 0.08), 0 9px 24px rgba(15, 15, 15, 0.14);
-  --ink: #2f3437;
-  --ink-fg: #ffffff;
-  --btn-bg: #2383e2; --btn-fg: #ffffff; --btn-line: transparent; --btn-bg-hover: #0b6fd0;
+  --font-head: ui-serif, Georgia, "Times New Roman", serif;
+  --head-weight: 400;
+  --pop: 0 0 0 1px rgba(71, 67, 42, 0.08), 0 3px 6px rgba(41, 41, 41, 0.06), 0 9px 24px rgba(41, 41, 41, 0.1);
+  --ink: #292929;
+  --ink-fg: #fcfcf8;
+  --btn-bg: #292929; --btn-fg: #fcfcf8; --btn-line: transparent; --btn-bg-hover: #4e4d4b;
   --btn-glow: none; --btn-glow-hover: none;
   --page-glow: none;
-  /* Notion colours for icons, tags and dots */
+  /* Colours for icons, tags and dots */
   --ic-gray: #91918e; --ic-brown: #9f6b53; --ic-orange: #d9730d; --ic-yellow: #cb912f; --ic-green: #448361;
   --ic-blue: #337ea9; --ic-purple: #9065b0; --ic-pink: #c14c8a; --ic-red: #d44c47;
   color-scheme: light;
 }
 :root[data-theme="dark"] {
-  --bg: #191919; --bg-sunk: #202020; --bg-hover: rgba(255, 255, 255, 0.05); --active: rgba(255, 255, 255, 0.085); --card: #252525;
-  --text: rgba(255, 255, 255, 0.86); --text-2: rgba(255, 255, 255, 0.6); --text-3: rgba(255, 255, 255, 0.42); --text-4: rgba(255, 255, 255, 0.24);
-  --line: rgba(255, 255, 255, 0.08); --line-2: rgba(255, 255, 255, 0.14);
-  --accent: #2383e2; --accent-bg: rgba(35, 131, 226, 0.16); --accent-line: rgba(35, 131, 226, 0.45); --accent-glow: transparent;
+  /* Granola's look in the dark: warm charcoal, light olive accent, light pill buttons, serif titles. */
+  --bg: #1b1b19; --bg-sunk: #222220; --bg-hover: rgba(255, 255, 240, 0.05); --active: rgba(255, 255, 240, 0.09); --card: #262624;
+  --text: #edece6; --text-2: #b5b4ae; --text-3: #8a8984; --text-4: #5e5d59;
+  --line: rgba(255, 255, 240, 0.08); --line-2: rgba(255, 255, 240, 0.14);
+  --accent: #b2c248; --accent-bg: rgba(178, 194, 72, 0.15); --accent-line: rgba(178, 194, 72, 0.45); --accent-glow: transparent; --accent-fg: #1b1b19;
   --green: #5ba37b; --green-bg: #213a2c; --amber: #ca984d; --amber-bg: #463720; --amber-line: rgba(202, 152, 77, 0.4);
-  --red: #e5675f; --red-bg: rgba(229, 103, 95, 0.13); --focus: #2383e2;
-  --pop: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 28px rgba(0, 0, 0, 0.5);
-  --ink: #ededed; --ink-fg: #191919;
-  --btn-bg: #2383e2; --btn-fg: #ffffff; --btn-line: transparent; --btn-bg-hover: #3a91e8; --btn-glow: none; --btn-glow-hover: none;
+  --red: #e5675f; --red-bg: rgba(229, 103, 95, 0.13); --focus: #b2c248;
+  --pop: 0 0 0 1px rgba(255, 255, 240, 0.08), 0 8px 28px rgba(0, 0, 0, 0.5);
+  --ink: #edece6; --ink-fg: #1b1b19;
+  --btn-bg: #fcfcf8; --btn-fg: #292929; --btn-line: transparent; --btn-bg-hover: #e5e4de; --btn-glow: none; --btn-glow-hover: none;
   --page-glow: none;
   --ic-gray: #9b9b9b; --ic-brown: #ba856f; --ic-orange: #d0844f; --ic-yellow: #ca984d; --ic-green: #5ba37b;
   --ic-blue: #5e9bd6; --ic-purple: #a77fd6; --ic-pink: #d56aa0; --ic-red: #e06560;
   color-scheme: dark;
 }
 :root[data-theme="synapse"] {
+  --font-head: var(--font); --head-weight: 600; --btn-radius: 6px;
   --bg: #070b16; --bg-sunk: #0b1120; --bg-hover: rgba(122, 162, 255, 0.07); --active: rgba(122, 162, 255, 0.12); --card: #0f182b;
   --text: rgba(255, 255, 255, 0.92); --text-2: rgba(255, 255, 255, 0.7); --text-3: rgba(255, 255, 255, 0.5); --text-4: rgba(255, 255, 255, 0.28);
   --line: rgba(255, 255, 255, 0.08); --line-2: rgba(255, 255, 255, 0.14);
@@ -69,15 +76,28 @@
   --btn-bg: rgba(74, 158, 255, 0.14); --btn-fg: #4a9eff; --btn-line: transparent; --btn-bg-hover: rgba(74, 158, 255, 0.22);
   --btn-glow: inset 0 0 0 1px rgba(74, 158, 255, 0.38), 0 0 18px rgba(74, 158, 255, 0.14);
   --btn-glow-hover: inset 0 0 0 1px rgba(74, 158, 255, 0.45), 0 0 28px rgba(74, 158, 255, 0.28);
-  --page-glow: radial-gradient(900px 420px at 78% -8%, rgba(74, 158, 255, 0.07), transparent 62%);
+  --page-glow: none;
   --ic-gray: #94a3b8; --ic-brown: #c9a08a; --ic-orange: #fb923c; --ic-yellow: #fbbf24; --ic-green: #34d399;
   --ic-blue: #4a9eff; --ic-purple: #a78bfa; --ic-pink: #f472b6; --ic-red: #f87171;
   color-scheme: dark;
 }
 
+/* Colour themes (same list in Cue and Master Inbox): the accent and a sidebar tint,
+   on top of Light or Dark. Olive, the default, is the base theme above. */
+:root[data-accent="navy"] { --accent: #3d4f8c; --accent-bg: rgba(61, 79, 140, 0.14); --accent-line: rgba(61, 79, 140, 0.45); --focus: #3d4f8c; --bg-sunk: #f3f4f8; }
+:root[data-theme="dark"][data-accent="navy"] { --accent: #8ea2e0; --accent-bg: rgba(142, 162, 224, 0.14); --accent-line: rgba(142, 162, 224, 0.45); --focus: #8ea2e0; --bg-sunk: #1f212a; }
+:root[data-accent="clay"] { --accent: #a4502e; --accent-bg: rgba(164, 80, 46, 0.14); --accent-line: rgba(164, 80, 46, 0.45); --focus: #a4502e; --bg-sunk: #f8f4f1; }
+:root[data-theme="dark"][data-accent="clay"] { --accent: #e0896a; --accent-bg: rgba(224, 137, 106, 0.14); --accent-line: rgba(224, 137, 106, 0.45); --focus: #e0896a; --bg-sunk: #252120; }
+:root[data-accent="slate"] { --accent: #3f5566; --accent-bg: rgba(63, 85, 102, 0.14); --accent-line: rgba(63, 85, 102, 0.45); --focus: #3f5566; --bg-sunk: #f3f5f6; }
+:root[data-theme="dark"][data-accent="slate"] { --accent: #9db3c4; --accent-bg: rgba(157, 179, 196, 0.14); --accent-line: rgba(157, 179, 196, 0.45); --focus: #9db3c4; --bg-sunk: #1f2326; }
+:root[data-accent="plum"] { --accent: #7a3f75; --accent-bg: rgba(122, 63, 117, 0.14); --accent-line: rgba(122, 63, 117, 0.45); --focus: #7a3f75; --bg-sunk: #f7f3f6; }
+:root[data-theme="dark"][data-accent="plum"] { --accent: #c99ac4; --accent-bg: rgba(201, 154, 196, 0.14); --accent-line: rgba(201, 154, 196, 0.45); --focus: #c99ac4; --bg-sunk: #241f24; }
+:root[data-accent="vision"] { --accent: #0072b2; --accent-bg: rgba(0, 114, 178, 0.14); --accent-line: rgba(0, 114, 178, 0.45); --focus: #0072b2; --bg-sunk: #f3f6f8; --green: #0072b2; --green-bg: #e6f1f8; --red: #c4500a; --red-bg: #fbeee5; }
+:root[data-theme="dark"][data-accent="vision"] { --accent: #56b4e9; --accent-bg: rgba(86, 180, 233, 0.14); --accent-line: rgba(86, 180, 233, 0.45); --focus: #56b4e9; --bg-sunk: #1e2328; --green: #56b4e9; --green-bg: rgba(86, 180, 233, 0.14); --red: #e8833a; --red-bg: rgba(232, 131, 58, 0.14); }
+
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; font-family: var(--font); color: var(--text); -webkit-font-smoothing: antialiased; font-feature-settings: 'cv11', 'ss01'; letter-spacing: -0.003em; }
 button { font: inherit; color: inherit; cursor: pointer; letter-spacing: inherit; }
 input, textarea, select { font: inherit; color: inherit; letter-spacing: inherit; }
-::selection { background: rgba(35, 131, 226, 0.22); }
+::selection { background: color-mix(in srgb, var(--accent) 22%, transparent); }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
